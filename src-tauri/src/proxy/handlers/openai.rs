@@ -70,8 +70,15 @@ pub async fn handle_chat_completions(
 
         // 4. 获取 Token (使用准确的 request_type)
         // 关键：在重试尝试 (attempt > 0) 时强制轮换账号
+        let quota_threshold = state.config.read().await.model_quota_threshold;
         let (access_token, project_id, email) = match token_manager
-            .get_token(&config.request_type, attempt > 0, Some(&session_id))
+            .get_token(
+                &config.request_type,
+                Some(&config.final_model),
+                quota_threshold,
+                attempt > 0,
+                Some(&session_id),
+            )
             .await
         {
             Ok(t) => t,
@@ -571,8 +578,9 @@ pub async fn handle_completions(
             &tools_val,
         );
 
+        let quota_threshold = state.config.read().await.model_quota_threshold;
         let (access_token, project_id, email) =
-            match token_manager.get_token(&config.request_type, false, None).await {
+            match token_manager.get_token(&config.request_type, Some(&config.final_model), quota_threshold, false, None).await {
                 Ok(t) => t,
                 Err(e) => {
                     return Err((
@@ -782,8 +790,11 @@ pub async fn handle_images_generations(
     // 3. 获取 Token
     let upstream = state.upstream.clone();
     let token_manager = state.token_manager;
+    let quota_threshold = state.config.read().await.model_quota_threshold;
 
-    let (access_token, project_id, email) = match token_manager.get_token("image_gen", false, None).await
+    let (access_token, project_id, email) = match token_manager
+        .get_token("image_gen", Some(model), quota_threshold, false, None)
+        .await
     {
         Ok(t) => t,
         Err(e) => {
@@ -1032,8 +1043,12 @@ pub async fn handle_images_edits(
     // 1. 获取 Upstream
     let upstream = state.upstream.clone();
     let token_manager = state.token_manager;
+    let quota_threshold = state.config.read().await.model_quota_threshold;
+
     // Fix: Proper get_token call with correct signature and unwrap (using image_gen quota)
-    let (access_token, project_id, _email) = match token_manager.get_token("image_gen", false, None).await
+    let (access_token, project_id, _email) = match token_manager
+        .get_token("image_gen", Some(&model), quota_threshold, false, None)
+        .await
     {
         Ok(t) => t,
         Err(e) => {

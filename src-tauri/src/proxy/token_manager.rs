@@ -1,6 +1,6 @@
 // 移除冗余的顶层导入，因为这些在代码中已由 full path 或局部导入处理
 use dashmap::DashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -19,6 +19,7 @@ pub struct ProxyToken {
     pub account_path: PathBuf,  // 账号文件路径，用于更新
     pub project_id: Option<String>,
     pub subscription_tier: Option<String>, // "FREE" | "PRO" | "ULTRA"
+    pub model_quotas: HashMap<String, f64>, // 新增: 模型名称 -> 剩余百分比 (0.0-1.0)
 }
 
 pub struct TokenManager {
@@ -163,7 +164,21 @@ impl TokenManager {
             .and_then(|q| q.get("subscription_tier"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        
+
+        // 【新增】提取模型配额信息
+        let mut model_quotas = HashMap::new();
+        if let Some(models) = account.get("quota").and_then(|q| q.get("models")).and_then(|m| m.as_array()) {
+            for m in models {
+                if let (Some(name), Some(percentage)) = (
+                    m.get("name").and_then(|n| n.as_str()),
+                    m.get("percentage").and_then(|p| p.as_f64())
+                ) {
+                    // 存储为 0.0-1.0 格式
+                    model_quotas.insert(name.to_string(), percentage / 100.0);
+                }
+            }
+        }
+
         Ok(Some(ProxyToken {
             account_id,
             access_token,
@@ -174,24 +189,47 @@ impl TokenManager {
             account_path: path.clone(),
             project_id,
             subscription_tier,
+            model_quotas,
         }))
     }
     
     /// 获取当前可用的 Token（支持粘性会话与智能调度）
     /// 参数 `quota_group` 用于区分 "claude" vs "gemini" 组
+    /// 参数 `model_name` 用于主动配额检查
     /// 参数 `force_rotate` 为 true 时将忽略锁定，强制切换账号
     /// 参数 `session_id` 用于跨请求维持会话粘性
-    pub async fn get_token(&self, quota_group: &str, force_rotate: bool, session_id: Option<&str>) -> Result<(String, String, String), String> {
+    pub async fn get_token(
+        &self,
+        quota_group: &str,
+        model_name: Option<&str>,
+        quota_threshold: f64,
+        force_rotate: bool,
+        session_id: Option<&str>,
+    ) -> Result<(String, String, String), String> {
         // 【优化 Issue #284】添加 5 秒超时，防止死锁
         let timeout_duration = std::time::Duration::from_secs(5);
-        match tokio::time::timeout(timeout_duration, self.get_token_internal(quota_group, force_rotate, session_id)).await {
+        match tokio::time::timeout(
+            timeout_duration,
+            self.get_token_internal(quota_group, model_name, quota_threshold, force_rotate, session_id),
+        )
+        .await
+        {
             Ok(result) => result,
-            Err(_) => Err("Token acquisition timeout (5s) - system too busy or deadlock detected".to_string()),
+            Err(_) => Err(
+                "Token acquisition timeout (5s) - system too busy or deadlock detected".to_string(),
+            ),
         }
     }
 
     /// 内部实现：获取 Token 的核心逻辑
-    async fn get_token_internal(&self, quota_group: &str, force_rotate: bool, session_id: Option<&str>) -> Result<(String, String, String), String> {
+    async fn get_token_internal(
+        &self,
+        quota_group: &str,
+        model_name: Option<&str>,
+        quota_threshold: f64,
+        force_rotate: bool,
+        session_id: Option<&str>,
+    ) -> Result<(String, String, String), String> {
         let mut tokens_snapshot: Vec<ProxyToken> = self.tokens.iter().map(|e| e.value().clone()).collect();
         let total = tokens_snapshot.len();
         if total == 0 {
@@ -236,7 +274,7 @@ impl TokenManager {
             // 模式 A: 粘性会话处理 (CacheFirst 或 Balance 且有 session_id)
             if !rotate && session_id.is_some() && scheduling.mode != SchedulingMode::PerformanceFirst {
                 let sid = session_id.unwrap();
-                
+
                 // 1. 检查会话是否已绑定账号
                 if let Some(bound_id) = self.session_accounts.get(sid).map(|v| v.clone()) {
                     // 2. 检查绑定的账号是否限流 (使用精准的剩余时间接口)
@@ -247,10 +285,26 @@ impl TokenManager {
                         tracing::warn!("Session {} bound account {} is rate-limited ({}s remaining). Unbinding and switching to next available account.", sid, bound_id, reset_sec);
                         self.session_accounts.remove(sid);
                     } else if !attempted.contains(&bound_id) {
-                        // 3. 账号可用且未被标记为尝试失败，优先复用
-                        if let Some(found) = tokens_snapshot.iter().find(|t| t.account_id == bound_id) {
-                            tracing::debug!("Sticky Session: Successfully reusing bound account {} for session {}", found.email, sid);
-                            target_token = Some(found.clone());
+                        // 【新增】主动检查配额
+                        let mut quota_ok = true;
+                        if let Some(model) = model_name {
+                            if let Some(token) = tokens_snapshot.iter().find(|t| t.account_id == bound_id) {
+                                if let Some(&remaining) = token.model_quotas.get(model) {
+                                    if remaining < quota_threshold {
+                                        tracing::warn!("Sticky Session: Account {} has low quota for {} ({:.2}% < {:.2}%). Unbinding.", token.email, model, remaining * 100.0, quota_threshold * 100.0);
+                                        self.session_accounts.remove(sid);
+                                        quota_ok = false;
+                                    }
+                                }
+                            }
+                        }
+
+                        if quota_ok {
+                            // 3. 账号可用且未被标记为尝试失败，优先复用
+                            if let Some(found) = tokens_snapshot.iter().find(|t| t.account_id == bound_id) {
+                                tracing::debug!("Sticky Session: Successfully reusing bound account {} for session {}", found.email, sid);
+                                target_token = Some(found.clone());
+                            }
                         }
                     }
                 }
@@ -262,15 +316,30 @@ impl TokenManager {
                 if let Some((account_id, last_time)) = &last_used_account_id {
                     if last_time.elapsed().as_secs() < 60 && !attempted.contains(account_id) {
                         if let Some(found) = tokens_snapshot.iter().find(|t| &t.account_id == account_id) {
-                            tracing::debug!("60s Window: Force reusing last account: {}", found.email);
-                            target_token = Some(found.clone());
+                            // 【新增】锁定复用也需要检查配額
+                            let mut quota_ok = true;
+                            if let Some(model) = model_name {
+                                if let Some(&remaining) = found.model_quotas.get(model) {
+                                    if remaining < quota_threshold {
+                                        tracing::warn!("60s Window: Last account {} has low quota for {} ({:.2}% < {:.2}%). Rotating.", found.email, model, remaining * 100.0, quota_threshold * 100.0);
+                                        quota_ok = false;
+                                    }
+                                }
+                            }
+
+                            if quota_ok {
+                                tracing::debug!("60s Window: Force reusing last account: {}", found.email);
+                                target_token = Some(found.clone());
+                            }
                         }
                     }
                 }
-                
+
                 // 若无锁定，则轮询选择新账号
                 if target_token.is_none() {
                     let start_idx = self.current_index.fetch_add(1, Ordering::SeqCst) % total;
+                    let mut best_fallback: Option<(ProxyToken, f64)> = None;
+
                     for offset in 0..total {
                         let idx = (start_idx + offset) % total;
                         let candidate = &tokens_snapshot[idx];
@@ -283,10 +352,23 @@ impl TokenManager {
                             continue;
                         }
 
+                        // 【新增】主动配额预检
+                        if let Some(model) = model_name {
+                            if let Some(&remaining) = candidate.model_quotas.get(model) {
+                                if remaining < quota_threshold {
+                                    // 记录剩余配额最高的账号作为备选
+                                    if best_fallback.is_none() || remaining > best_fallback.as_ref().unwrap().1 {
+                                        best_fallback = Some((candidate.clone(), remaining));
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+
                         target_token = Some(candidate.clone());
                         // 【优化】标记需要更新，稍后统一写回
                         need_update_last_used = Some((candidate.account_id.clone(), std::time::Instant::now()));
-                        
+
                         // 如果是会话首次分配且需要粘性，在此建立绑定
                         if let Some(sid) = session_id {
                             if scheduling.mode != SchedulingMode::PerformanceFirst {
@@ -296,10 +378,20 @@ impl TokenManager {
                         }
                         break;
                     }
+
+                    // 【新增】智能降级：如果所有账号都低于阈值，则使用配额最多的账号
+                    if target_token.is_none() && best_fallback.is_some() {
+                        let (best_token, remaining) = best_fallback.unwrap();
+                        tracing::warn!("Quota Protection: All accounts below threshold. Falling back to account {} with highest remaining quota ({:.2}%)", best_token.email, remaining * 100.0);
+                        target_token = Some(best_token.clone());
+                        need_update_last_used = Some((best_token.account_id.clone(), std::time::Instant::now()));
+                    }
                 }
             } else if target_token.is_none() {
                 // 模式 C: 纯轮询模式 (Round-robin) 或强制轮换
                 let start_idx = self.current_index.fetch_add(1, Ordering::SeqCst) % total;
+                let mut best_fallback: Option<(ProxyToken, f64)> = None;
+
                 for offset in 0..total {
                     let idx = (start_idx + offset) % total;
                     let candidate = &tokens_snapshot[idx];
@@ -312,12 +404,32 @@ impl TokenManager {
                         continue;
                     }
 
+                    // 【新增】主动配额预检
+                    if let Some(model) = model_name {
+                        if let Some(&remaining) = candidate.model_quotas.get(model) {
+                            if remaining < quota_threshold {
+                                // 记录剩余配额最高的账号作为备选
+                                if best_fallback.is_none() || remaining > best_fallback.as_ref().unwrap().1 {
+                                    best_fallback = Some((candidate.clone(), remaining));
+                                }
+                                continue;
+                            }
+                        }
+                    }
+
                     target_token = Some(candidate.clone());
-                    
+
                     if rotate {
                         tracing::debug!("Force Rotation: Switched to account: {}", candidate.email);
                     }
                     break;
+                }
+
+                // 【新增】智能降级
+                if target_token.is_none() && best_fallback.is_some() {
+                    let (best_token, remaining) = best_fallback.unwrap();
+                    tracing::warn!("Quota Protection (Rotation): All accounts below threshold. Falling back to account {} ({:.2}%)", best_token.email, remaining * 100.0);
+                    target_token = Some(best_token);
                 }
             }
             
@@ -836,6 +948,18 @@ impl TokenManager {
     /// 清除所有会话的粘性映射
     pub fn clear_all_sessions(&self) {
         self.session_accounts.clear();
+    }
+
+    /// 更新内存中特定账号的模型配额信息
+    pub fn update_token_quota(&self, account_id: &str, quota_data: &crate::models::quota::QuotaData) {
+        if let Some(mut entry) = self.tokens.get_mut(account_id) {
+            let mut model_quotas = HashMap::new();
+            for m in &quota_data.models {
+                model_quotas.insert(m.name.clone(), m.percentage as f64 / 100.0);
+            }
+            entry.model_quotas = model_quotas;
+            tracing::debug!("Updated in-memory quotas for account {}", account_id);
+        }
     }
 }
 

@@ -142,6 +142,15 @@ async fn internal_refresh_account_quota(
         Ok(quota) => {
             // 更新账号配额
             let _ = modules::update_account_quota(&account.id, quota.clone());
+
+            // 【新增】同步到正在运行的 TokenManager
+            if let Some(proxy_state) = app.try_state::<crate::commands::proxy::ProxyServiceState>() {
+                let instance_lock = proxy_state.instance.read().await;
+                if let Some(instance) = instance_lock.as_ref() {
+                    instance.token_manager.update_token_quota(&account.id, &quota);
+                }
+            }
+
             // 更新托盘菜单
             crate::modules::tray::update_tray_menus(app);
             Ok(quota)
@@ -170,6 +179,14 @@ pub async fn fetch_account_quota(
     modules::update_account_quota(&account_id, quota.clone())
         .map_err(crate::error::AppError::Account)?;
 
+    // 【新增】同步到正在运行的 TokenManager
+    if let Some(proxy_state) = app.try_state::<crate::commands::proxy::ProxyServiceState>() {
+        let instance_lock = proxy_state.instance.read().await;
+        if let Some(instance) = instance_lock.as_ref() {
+            instance.token_manager.update_token_quota(&account_id, &quota);
+        }
+    }
+
     crate::modules::tray::update_tray_menus(&app);
 
     Ok(quota)
@@ -185,7 +202,7 @@ pub struct RefreshStats {
 
 /// 刷新所有账号配额
 #[tauri::command]
-pub async fn refresh_all_quotas() -> Result<RefreshStats, String> {
+pub async fn refresh_all_quotas(app: tauri::AppHandle) -> Result<RefreshStats, String> {
     use futures::future::join_all;
     use std::sync::Arc;
     use tokio::sync::Semaphore;
@@ -200,6 +217,7 @@ pub async fn refresh_all_quotas() -> Result<RefreshStats, String> {
     let accounts = modules::list_accounts()?;
 
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT));
+    let app_clone = app.clone();
 
     let tasks: Vec<_> = accounts
         .into_iter()
@@ -220,16 +238,24 @@ pub async fn refresh_all_quotas() -> Result<RefreshStats, String> {
             let email = account.email.clone();
             let account_id = account.id.clone();
             let permit = semaphore.clone();
+            let app_inner = app_clone.clone();
             async move {
                 let _guard = permit.acquire().await.unwrap();
                 modules::logger::log_info(&format!("  - Processing {}", email));
                 match modules::account::fetch_quota_with_retry(&mut account).await {
                     Ok(quota) => {
-                        if let Err(e) = modules::update_account_quota(&account_id, quota) {
+                        if let Err(e) = modules::update_account_quota(&account_id, quota.clone()) {
                             let msg = format!("Account {}: Save quota failed - {}", email, e);
                             modules::logger::log_error(&msg);
                             Err(msg)
                         } else {
+                            // 【新增】同步到正在运行的 TokenManager
+                            if let Some(proxy_state) = app_inner.try_state::<crate::commands::proxy::ProxyServiceState>() {
+                                let instance_lock = proxy_state.instance.read().await;
+                                if let Some(instance) = instance_lock.as_ref() {
+                                    instance.token_manager.update_token_quota(&account_id, &quota);
+                                }
+                            }
                             modules::logger::log_info(&format!("    ✅ {} Success", email));
                             Ok(())
                         }

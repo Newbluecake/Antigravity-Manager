@@ -513,7 +513,18 @@ pub async fn handle_messages(
         let session_id = Some(session_id_str.as_str());
 
         let force_rotate_token = attempt > 0;
-        let (access_token, project_id, email) = match token_manager.get_token(&config.request_type, force_rotate_token, session_id).await {
+        let quota_threshold = state.config.read().await.model_quota_threshold;
+
+        let (access_token, project_id, email) = match token_manager
+            .get_token(
+                &config.request_type,
+                Some(&config.final_model),
+                quota_threshold,
+                force_rotate_token,
+                session_id,
+            )
+            .await
+        {
             Ok(t) => t,
             Err(e) => {
                 let safe_message = if e.contains("invalid_grant") {
