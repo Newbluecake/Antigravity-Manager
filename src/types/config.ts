@@ -10,7 +10,7 @@ export interface ProxyConfig {
     port: number;
     api_key: string;
     auto_start: boolean;
-    custom_mapping?: Record<string, string>;
+    custom_mapping?: Record<string, string | string[]>;
     request_timeout: number;
     enable_logging: boolean;
     upstream_proxy: UpstreamProxyConfig;

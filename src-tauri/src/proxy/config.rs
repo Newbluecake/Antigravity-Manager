@@ -144,6 +144,22 @@ impl Default for ExperimentalConfig {
 
 fn default_true() -> bool { true }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ModelMappingTarget {
+    Single(String),
+    Chain(Vec<String>),
+}
+
+impl ModelMappingTarget {
+    pub fn to_chain(&self) -> Vec<String> {
+        match self {
+            ModelMappingTarget::Single(s) => vec![s.clone()],
+            ModelMappingTarget::Chain(v) => v.clone(),
+        }
+    }
+}
+
 /// 反代服务配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyConfig {
@@ -163,20 +179,20 @@ pub struct ProxyConfig {
     /// - auto: recommended defaults (currently: allow_lan_access => all_except_health, else off)
     #[serde(default)]
     pub auth_mode: ProxyAuthMode,
-    
+
     /// 监听端口
     pub port: u16,
-    
+
     /// API 密钥
     pub api_key: String,
-    
+
 
     /// 是否自动启动
     pub auto_start: bool,
 
     /// 自定义精确模型映射表 (key: 原始模型名, value: 目标模型名)
     #[serde(default)]
-    pub custom_mapping: std::collections::HashMap<String, String>,
+    pub custom_mapping: std::collections::HashMap<String, ModelMappingTarget>,
 
     /// API 请求超时时间(秒)
     #[serde(default = "default_request_timeout")]
@@ -193,7 +209,7 @@ pub struct ProxyConfig {
     /// z.ai provider configuration (Anthropic-compatible).
     #[serde(default)]
     pub zai: ZaiConfig,
-    
+
     /// 账号调度配置 (粘性会话/限流重试)
     #[serde(default)]
     pub scheduling: crate::proxy::sticky_config::StickySessionConfig,

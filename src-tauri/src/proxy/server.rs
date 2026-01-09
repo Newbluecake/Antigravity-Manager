@@ -17,7 +17,7 @@ use std::sync::atomic::AtomicUsize;
 #[derive(Clone)]
 pub struct AppState {
     pub token_manager: Arc<TokenManager>,
-    pub custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
+    pub custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, crate::proxy::config::ModelMappingTarget>>>,
     #[allow(dead_code)]
     pub request_timeout: u64, // API 请求超时(秒)
     #[allow(dead_code)]
@@ -36,7 +36,7 @@ pub struct AppState {
 /// Axum 服务器实例
 pub struct AxumServer {
     shutdown_tx: Option<oneshot::Sender<()>>,
-    custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
+    custom_mapping: Arc<tokio::sync::RwLock<std::collections::HashMap<String, crate::proxy::config::ModelMappingTarget>>>,
     proxy_state: Arc<tokio::sync::RwLock<crate::proxy::config::UpstreamProxyConfig>>,
     security_state: Arc<RwLock<crate::proxy::ProxySecurityConfig>>,
     zai_state: Arc<RwLock<crate::proxy::ZaiConfig>>,
@@ -74,7 +74,7 @@ impl AxumServer {
         host: String,
         port: u16,
         token_manager: Arc<TokenManager>,
-        custom_mapping: std::collections::HashMap<String, String>,
+        custom_mapping: std::collections::HashMap<String, crate::proxy::config::ModelMappingTarget>,
         _request_timeout: u64,
         upstream_proxy: crate::proxy::config::UpstreamProxyConfig,
         security_config: crate::proxy::ProxySecurityConfig,

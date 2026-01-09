@@ -77,7 +77,7 @@ pub fn get_supported_models() -> Vec<String> {
 
 /// 动态获取所有可用模型列表 (包含内置与用户自定义)
 pub async fn get_all_dynamic_models(
-    custom_mapping: &tokio::sync::RwLock<std::collections::HashMap<String, String>>,
+    custom_mapping: &tokio::sync::RwLock<std::collections::HashMap<String, crate::proxy::config::ModelMappingTarget>>,
 ) -> Vec<String> {
     use std::collections::HashSet;
     let mut model_ids = HashSet::new();
@@ -97,12 +97,12 @@ pub async fn get_all_dynamic_models(
 
     // 5. 确保包含常用的 Gemini/画画模型 ID
     model_ids.insert("gemini-3-pro-low".to_string());
-    
+
     // [NEW] Issue #247: Dynamically generate all Image Gen Combinations
     let base = "gemini-3-pro-image";
     let resolutions = vec!["", "-2k", "-4k"];
     let ratios = vec!["", "-1x1", "-4x3", "-3x4", "-16x9", "-9x16", "-21x9"];
-    
+
     for res in resolutions {
         for ratio in ratios.iter() {
             let mut id = base.to_string();
@@ -127,7 +127,7 @@ pub async fn get_all_dynamic_models(
 
 /// 通配符匹配辅助函数
 /// 支持简单的 * 通配符匹配
-/// 
+///
 /// # 示例
 /// - `gpt-4*` 匹配 `gpt-4`, `gpt-4-turbo`, `gpt-4-0613` 等
 /// - `claude-3-5-sonnet-*` 匹配所有 3.5 sonnet 版本
@@ -142,39 +142,51 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
     }
 }
 
-/// 核心模型路由解析引擎
+/// 核心模型路由解析引擎 - 链式解析
 /// 优先级：精确匹配 > 通配符匹配 > 系统默认映射
-/// 
+///
 /// # 参数
 /// - `original_model`: 原始模型名称
 /// - `custom_mapping`: 用户自定义映射表
-/// 
+///
 /// # 返回
-/// 映射后的目标模型名称
-pub fn resolve_model_route(
+/// 目标模型链 (Vec<String>)，至少包含一个元素
+pub fn resolve_model_chain(
     original_model: &str,
-    custom_mapping: &std::collections::HashMap<String, String>,
-) -> String {
+    custom_mapping: &std::collections::HashMap<String, crate::proxy::config::ModelMappingTarget>,
+) -> Vec<String> {
     // 1. 精确匹配 (最高优先级)
     if let Some(target) = custom_mapping.get(original_model) {
-        crate::modules::logger::log_info(&format!("[Router] 精确映射: {} -> {}", original_model, target));
-        return target.clone();
+        let chain = target.to_chain();
+        crate::modules::logger::log_info(&format!("[Router] 精确映射: {} -> {:?}", original_model, chain));
+        return chain;
     }
-    
+
     // 2. 通配符匹配
     for (pattern, target) in custom_mapping.iter() {
         if pattern.contains('*') && wildcard_match(pattern, original_model) {
-            crate::modules::logger::log_info(&format!("[Router] 通配符映射: {} -> {} (规则: {})", original_model, target, pattern));
-            return target.clone();
+            let chain = target.to_chain();
+            crate::modules::logger::log_info(&format!("[Router] 通配符映射: {} -> {:?} (规则: {})", original_model, chain, pattern));
+            return chain;
         }
     }
-    
+
     // 3. 系统默认映射
     let result = map_claude_model_to_gemini(original_model);
     if result != original_model {
         crate::modules::logger::log_info(&format!("[Router] 系统默认映射: {} -> {}", original_model, result));
     }
-    result
+    vec![result]
+}
+
+/// 核心模型路由解析引擎 - 兼容接口 (返回链的第一个元素)
+pub fn resolve_model_route(
+    original_model: &str,
+    custom_mapping: &std::collections::HashMap<String, crate::proxy::config::ModelMappingTarget>,
+) -> String {
+    let chain = resolve_model_chain(original_model, custom_mapping);
+    // resolve_model_chain 保证至少返回一个元素
+    chain.first().unwrap().clone()
 }
 
 #[cfg(test)]
