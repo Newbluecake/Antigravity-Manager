@@ -171,12 +171,6 @@ mod tests {
         assert!(result.get("candidates").is_some());
         assert!(result.get("response").is_none());
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
 
     #[test]
     fn test_antigravity_identity_injection_with_role() {
@@ -184,15 +178,15 @@ mod tests {
             "model": "gemini-pro",
             "messages": []
         });
-        
+
         let result = wrap_request(&body, "test-proj", "gemini-pro");
-        
+
         // 验证 systemInstruction
         let sys = result.get("request").unwrap().get("systemInstruction").unwrap();
-        
+
         // 1. 验证 role: "user"
         assert_eq!(sys.get("role").unwrap(), "user");
-        
+
         // 2. 验证 Antigravity 身份注入
         let parts = sys.get("parts").unwrap().as_array().unwrap();
         assert!(!parts.is_empty());
