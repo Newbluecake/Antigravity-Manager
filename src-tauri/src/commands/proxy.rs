@@ -89,6 +89,9 @@ pub async fn start_proxy_service(
         }
     }
     
+    // 保存配置到全局 AppConfig
+    let app_config = crate::modules::config::load_app_config().map_err(|e| e)?;
+
     // 启动 Axum 服务器
     let (axum_server, server_handle) =
         match crate::proxy::AxumServer::start(
@@ -102,7 +105,7 @@ pub async fn start_proxy_service(
             config.zai.clone(),
             monitor.clone(),
             config.experimental.clone(),
-
+            app_config.clone(),
         ).await {
             Ok((server, handle)) => (server, handle),
             Err(e) => return Err(format!("启动 Axum 服务器失败: {}", e)),
@@ -117,12 +120,12 @@ pub async fn start_proxy_service(
     };
     
     *instance_lock = Some(instance);
-    
+
 
     // 保存配置到全局 AppConfig
-    let mut app_config = crate::modules::config::load_app_config().map_err(|e| e)?;
-    app_config.proxy = config.clone();
-    crate::modules::config::save_app_config(&app_config).map_err(|e| e)?;
+    let mut app_config_save = app_config.clone();
+    app_config_save.proxy = config.clone();
+    crate::modules::config::save_app_config(&app_config_save).map_err(|e| e)?;
     
     Ok(ProxyStatus {
         running: true,

@@ -30,6 +30,7 @@ pub struct AppState {
     pub zai_vision_mcp: Arc<crate::proxy::zai_vision_mcp::ZaiVisionMcpState>,
     pub monitor: Arc<crate::proxy::monitor::ProxyMonitor>,
     pub experimental: Arc<RwLock<crate::proxy::config::ExperimentalConfig>>,
+    pub config: Arc<RwLock<crate::models::config::AppConfig>>,
 }
 
 /// Axum 服务器实例
@@ -80,7 +81,7 @@ impl AxumServer {
         zai_config: crate::proxy::ZaiConfig,
         monitor: Arc<crate::proxy::monitor::ProxyMonitor>,
         experimental_config: crate::proxy::config::ExperimentalConfig,
-
+        app_config: crate::models::config::AppConfig,
     ) -> Result<(Self, tokio::task::JoinHandle<()>), String> {
         let custom_mapping_state = Arc::new(tokio::sync::RwLock::new(custom_mapping));
 	        let proxy_state = Arc::new(tokio::sync::RwLock::new(upstream_proxy.clone()));
@@ -90,6 +91,7 @@ impl AxumServer {
 	        let zai_vision_mcp_state =
 	            Arc::new(crate::proxy::zai_vision_mcp::ZaiVisionMcpState::new());
 	        let experimental_state = Arc::new(RwLock::new(experimental_config));
+	        let config_state = Arc::new(RwLock::new(app_config));
 
 	        let state = AppState {
 	            token_manager: token_manager.clone(),
@@ -107,6 +109,7 @@ impl AxumServer {
             zai_vision_mcp: zai_vision_mcp_state,
             monitor: monitor.clone(),
             experimental: experimental_state,
+            config: config_state,
         };
 
 

@@ -17,6 +17,12 @@ pub struct AppConfig {
     pub antigravity_args: Option<Vec<String>>, // [NEW] Antigravity 启动参数
     #[serde(default)]
     pub auto_launch: bool,  // 开机自动启动
+    #[serde(default = "default_quota_threshold")]
+    pub model_quota_threshold: f64, // 模型配额跳过阈值 (0.01 = 1%)
+}
+
+fn default_quota_threshold() -> f64 {
+    0.01
 }
 
 impl AppConfig {
@@ -33,6 +39,7 @@ impl AppConfig {
             antigravity_executable: None,
             antigravity_args: None,
             auto_launch: false,
+            model_quota_threshold: default_quota_threshold(),
         }
     }
 }
