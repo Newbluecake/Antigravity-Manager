@@ -483,6 +483,30 @@ function Settings() {
                                 </p>
                             </div>
 
+                            {/* 模型配额阈值 */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">
+                                    模型配额阈值 (Model Quota Threshold)
+                                </label>
+                                <div className="flex gap-2 items-center">
+                                    <input
+                                        type="number"
+                                        className="w-32 px-4 py-4 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 text-gray-900 dark:text-base-content font-medium"
+                                        min="0"
+                                        max="1"
+                                        step="0.01"
+                                        value={formData.model_quota_threshold || 0.01}
+                                        onChange={(e) => setFormData({ ...formData, model_quota_threshold: parseFloat(e.target.value) })}
+                                    />
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                        ({((formData.model_quota_threshold || 0.01) * 100).toFixed(0)}%)
+                                    </span>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                                    当某个模型的配额低于此阈值时，系统会自动跳过该账号。默认值: 0.01 (1%)
+                                </p>
+                            </div>
+
                             <div className="border-t border-gray-200 dark:border-base-200 pt-4">
                                 <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.advanced.logs_title')}</h3>
                                 <div className="bg-gray-50 dark:bg-base-200 border border-gray-200 dark:border-base-300 rounded-lg p-3 mb-3">
