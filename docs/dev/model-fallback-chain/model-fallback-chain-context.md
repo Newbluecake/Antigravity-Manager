@@ -2,7 +2,7 @@
 feature: model-fallback-chain
 version: 1
 started_at: 2026-01-10T00:00:00Z
-updated_at: 2026-01-10T00:50:00Z
+updated_at: 2026-01-10T01:00:00Z
 
 # 参数记录
 params:
@@ -13,7 +13,7 @@ params:
 
 # 当前状态
 current_phase: completed
-current_stage: 6
+current_stage: 7
 current_task: ALL_COMPLETED
 
 # Planning 阶段记录
@@ -60,3 +60,10 @@ execution:
       content: Integrate into Settings page
 
 failures: []
+
+# 最终交付
+pull_request: https://github.com/Newbluecake/Antigravity-Manager/pull/1
+documentation:
+  - docs/dev/model-fallback-chain/model-fallback-chain-requirements.md
+  - docs/dev/model-fallback-chain/model-fallback-chain-design.md
+  - docs/dev/model-fallback-chain/acceptance_report.md
