@@ -214,6 +214,10 @@ pub struct ProxyConfig {
     #[serde(default)]
     pub scheduling: crate::proxy::sticky_config::StickySessionConfig,
 
+    /// 是否启用配额优先策略 (默认 false)
+    #[serde(default)]
+    pub quota_priority_enabled: bool,
+
     /// 实验性功能配置
     #[serde(default)]
     pub experimental: ExperimentalConfig,
@@ -243,6 +247,7 @@ impl Default for ProxyConfig {
             upstream_proxy: UpstreamProxyConfig::default(),
             zai: ZaiConfig::default(),
             scheduling: crate::proxy::sticky_config::StickySessionConfig::default(),
+            quota_priority_enabled: false,
             experimental: ExperimentalConfig::default(),
         }
     }
