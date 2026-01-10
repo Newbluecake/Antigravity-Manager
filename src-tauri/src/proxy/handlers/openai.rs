@@ -94,6 +94,13 @@ pub async fn handle_chat_completions(
         {
             Ok(t) => t,
             Err(e) => {
+                // [Fix] If current model pool is completely exhausted (Hard Floor),
+                // fallback to the next model in the chain immediately.
+                if e.contains("All accounts exhausted") {
+                    tracing::warn!("[Fallback] Current model {} pool exhausted (All accounts exhausted). Switching to next model.", mapped_model);
+                    continue;
+                }
+
                 return Err((
                     StatusCode::SERVICE_UNAVAILABLE,
                     format!("Token error: {}", e),
@@ -222,6 +229,18 @@ pub async fn handle_chat_completions(
             // 记录限流信息 (全局同步)
             token_manager.mark_rate_limited(&email, status_code, retry_after.as_deref(), &error_text);
 
+            // [Fix] 如果是 QUOTA_EXHAUSTED，忽略 Retry-After，立即轮换
+            if error_text.contains("QUOTA_EXHAUSTED") {
+                tracing::warn!(
+                    "OpenAI Quota exhausted (429) on account {} attempt {}/{}, rotating account immediately.",
+                    email,
+                    attempt + 1,
+                    max_attempts
+                );
+                // 不要 return Err, 也不要 sleep (continue 会触发下一次循环)
+                continue;
+            }
+
             // 1. 优先尝试解析 RetryInfo (由 Google Cloud 直接下发)
             if let Some(delay_ms) = crate::proxy::upstream::retry::parse_retry_delay(&error_text) {
                 let actual_delay = delay_ms.saturating_add(200).min(10_000);
@@ -237,16 +256,7 @@ pub async fn handle_chat_completions(
                 continue;
             }
 
-            // 2. 只有明确包含 "QUOTA_EXHAUSTED" 才停止，避免误判频率提示 (如 "check quota")
-            if error_text.contains("QUOTA_EXHAUSTED") {
-                error!(
-                    "OpenAI Quota exhausted (429) on account {} attempt {}/{}, stopping to protect pool.",
-                    email,
-                    attempt + 1,
-                    max_attempts
-                );
-                return Err((status, error_text));
-            }
+            // 2. [Removed] Old QUOTA_EXHAUSTED stop logic was here. Now handled above.
 
             // 3. 其他限流或服务器过载情况，轮换账号
             tracing::warn!(
@@ -605,6 +615,12 @@ pub async fn handle_completions(
             match token_manager.get_token(&config.request_type, Some(&config.final_model), quota_threshold, false, None).await {
                 Ok(t) => t,
                 Err(e) => {
+                    // [Fix] If current model pool is completely exhausted (Hard Floor),
+                    // fallback to the next model in the chain immediately.
+                    if e.contains("All accounts exhausted") {
+                        tracing::warn!("[Fallback] Current model {} pool exhausted (All accounts exhausted). Switching to next model.", mapped_model);
+                        continue;
+                    }
                     return Err((
                         StatusCode::SERVICE_UNAVAILABLE,
                         format!("Token error: {}", e),

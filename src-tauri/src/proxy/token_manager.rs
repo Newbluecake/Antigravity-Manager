@@ -379,12 +379,17 @@ impl TokenManager {
                         break;
                     }
 
-                    // 【新增】智能降级：如果所有账号都低于阈值，则使用配额最多的账号
+                        // 【新增】智能降级：如果所有账号都低于阈值，则使用配额最多的账号
+                    // Hard Floor: 0.0001 (0.01%) - 绝对枯竭线
                     if target_token.is_none() && best_fallback.is_some() {
                         let (best_token, remaining) = best_fallback.unwrap();
-                        tracing::warn!("Quota Protection: All accounts below threshold. Falling back to account {} with highest remaining quota ({:.2}%)", best_token.email, remaining * 100.0);
-                        target_token = Some(best_token.clone());
-                        need_update_last_used = Some((best_token.account_id.clone(), std::time::Instant::now()));
+                        if remaining > 0.0001 {
+                            tracing::warn!("Quota Protection: All accounts below threshold. Falling back to account {} with highest remaining quota ({:.2}%)", best_token.email, remaining * 100.0);
+                            target_token = Some(best_token.clone());
+                            need_update_last_used = Some((best_token.account_id.clone(), std::time::Instant::now()));
+                        } else {
+                            last_error = Some("All accounts exhausted (Quota < 0.01%)".to_string());
+                        }
                     }
                 }
             } else if target_token.is_none() {
@@ -428,14 +433,25 @@ impl TokenManager {
                 // 【新增】智能降级
                 if target_token.is_none() && best_fallback.is_some() {
                     let (best_token, remaining) = best_fallback.unwrap();
-                    tracing::warn!("Quota Protection (Rotation): All accounts below threshold. Falling back to account {} ({:.2}%)", best_token.email, remaining * 100.0);
-                    target_token = Some(best_token);
+                    if remaining > 0.0001 {
+                        tracing::warn!("Quota Protection (Rotation): All accounts below threshold. Falling back to account {} ({:.2}%)", best_token.email, remaining * 100.0);
+                        target_token = Some(best_token);
+                    } else {
+                        last_error = Some("All accounts exhausted (Quota < 0.01%)".to_string());
+                    }
                 }
             }
             
             let mut token = match target_token {
                 Some(t) => t,
                 None => {
+                    // 【新增】优先返回配额枯竭错误
+                    if let Some(err) = &last_error {
+                        if err.contains("exhausted") {
+                            return Err(err.clone());
+                        }
+                    }
+
                     // 乐观重置策略: 双层防护机制
                     // 当所有账号都无法选择时,可能是时序竞争导致的状态不同步
                     
@@ -1015,14 +1031,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fallback_when_all_accounts_low_quota() {
+    async fn test_hard_floor_exhaustion() {
         let manager = TokenManager::new(PathBuf::from("/tmp"));
 
-        // Account A: 0.2%
-        // Account B: 0.8%
-        // Both are below 1.0% threshold
-        let token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.002);
-        let token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.008);
+        // Account A: 0.005% (below 0.01% floor)
+        // Account B: 0.008% (below 0.01% floor)
+        let token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.00005);
+        let token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.00008);
 
         manager.tokens.insert("a".to_string(), token_a);
         manager.tokens.insert("b".to_string(), token_b);
@@ -1030,9 +1045,10 @@ mod tests {
         // Act: Request token with 1.0% threshold
         let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None).await;
 
-        // Assert: Should fallback to Account B (highest remaining quota)
-        assert!(result.is_ok());
-        let (_, _, email) = result.unwrap();
-        assert_eq!(email, "b@example.com");
+        // Assert: Should fail with specific error
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("All accounts exhausted"));
+        assert!(err.contains("Quota < 0.01%"));
     }
 }

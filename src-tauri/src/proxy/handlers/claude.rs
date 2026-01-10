@@ -184,6 +184,12 @@ fn determine_retry_strategy(
     error_text: &str,
     retried_without_thinking: bool,
 ) -> RetryStrategy {
+    // [Fix] Detect Upstream QUOTA_EXHAUSTED (429) -> Immediate Rotation
+    // Ignore Retry-After header for this specific error to allow fast switching to next account
+    if status_code == 429 && (error_text.contains("QUOTA_EXHAUSTED") || error_text.contains("RESOURCE_EXHAUSTED")) {
+        return RetryStrategy::FixedDelay(Duration::from_millis(0));
+    }
+
     match status_code {
         // 400 错误：Thinking 签名失败
         400 if !retried_without_thinking
@@ -538,6 +544,13 @@ pub async fn handle_messages(
         {
             Ok(t) => t,
             Err(e) => {
+                // [Fix] If current model pool is completely exhausted (Hard Floor),
+                // fallback to the next model in the chain immediately.
+                if e.contains("All accounts exhausted") {
+                    tracing::warn!("[Fallback] Current model {} pool exhausted (All accounts exhausted). Switching to next model.", mapped_model);
+                    continue;
+                }
+
                 let safe_message = if e.contains("invalid_grant") {
                     "OAuth refresh failed (invalid_grant): refresh_token likely revoked/expired; reauthorize account(s) to restore service.".to_string()
                 } else {
