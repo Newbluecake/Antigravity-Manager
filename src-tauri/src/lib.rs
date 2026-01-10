@@ -20,9 +20,6 @@ pub fn run() {
     // 初始化日志
     logger::init_logger();
 
-    // 初始化崩溃日志
-    modules::crash_logger::init_crash_logger(modules::crash_logger::CrashLoggerConfig::default());
-    
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -43,6 +40,10 @@ pub fn run() {
         .manage(commands::proxy::ProxyServiceState::new())
         .setup(|app| {
             info!("Setup starting...");
+
+            // 初始化崩溃日志 (在 setup 中初始化以确保 Tokio Runtime 已就绪)
+            modules::crash_logger::init_crash_logger(modules::crash_logger::CrashLoggerConfig::default());
+
             modules::tray::create_tray(app.handle())?;
             info!("Tray created");
             

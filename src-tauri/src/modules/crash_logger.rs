@@ -300,13 +300,12 @@ pub fn init_crash_logger(config: CrashLoggerConfig) {
         }
     };
 
-    // 执行日志轮转 (使用独立线程, 不依赖 Tokio Runtime, 避免启动时 panic)
+    // 执行日志轮转 (异步, 不阻塞启动)
     let log_dir_clone = log_dir.clone();
     let config_clone = config.clone();
-    std::thread::spawn(move || {
+    tokio::spawn(async move {
         if let Err(e) = rotate_logs(&log_dir_clone, &config_clone) {
-            // 在 logger 初始化前可能无法打印日志，但在 panic hook 设置后没问题
-            eprintln!("Failed to rotate logs: {}", e);
+            warn!("Failed to rotate logs: {}", e);
         }
     });
 
