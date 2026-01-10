@@ -486,20 +486,31 @@ pub async fn handle_messages(
     // 3. 准备闭包
     let mut request_for_body = request.clone();
     let token_manager = state.token_manager;
-    
+
     let pool_size = token_manager.len();
-    let max_attempts = MAX_RETRY_ATTEMPTS.min(pool_size).max(1);
+
+    // Resolve model chain
+    let model_chain = crate::proxy::common::model_mapping::resolve_model_chain(
+        &request_for_body.model,
+        &*state.custom_mapping.read().await,
+    );
+
+    let base_attempts = MAX_RETRY_ATTEMPTS.min(pool_size).max(1);
+    let max_attempts = base_attempts.max(model_chain.len());
 
     let mut last_error = String::new();
     let mut retried_without_thinking = false;
-    
+
     for attempt in 0..max_attempts {
-        // 2. 模型路由解析
-        let mut mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
-            &request_for_body.model,
-            &*state.custom_mapping.read().await,
-        );
-        
+        // 2. Select model from chain
+        let chain_index = if attempt < model_chain.len() { attempt } else { model_chain.len() - 1 };
+        let mut mapped_model = model_chain[chain_index].clone();
+
+        if attempt > 0 && chain_index > 0 && chain_index == attempt {
+             let prev_model = &model_chain[chain_index - 1];
+             tracing::warn!("[Fallback] Switching model {} -> {} due to error", prev_model, mapped_model);
+        }
+
         // 将 Claude 工具转为 Value 数组以便探测联网
         let tools_val: Option<Vec<Value>> = request_for_body.tools.as_ref().map(|list| {
             list.iter().map(|t| serde_json::to_value(t).unwrap_or(json!({}))).collect()

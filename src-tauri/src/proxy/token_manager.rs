@@ -971,3 +971,68 @@ fn truncate_reason(reason: &str, max_len: usize) -> String {
     s.push('…');
     s
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_mock_token(id: &str, email: &str, model: &str, quota: f64) -> ProxyToken {
+        let mut model_quotas = HashMap::new();
+        model_quotas.insert(model.to_string(), quota);
+        ProxyToken {
+            account_id: id.to_string(),
+            access_token: "mock_access".to_string(),
+            refresh_token: "mock_refresh".to_string(),
+            expires_in: 3600,
+            timestamp: chrono::Utc::now().timestamp() + 3600,
+            email: email.to_string(),
+            account_path: PathBuf::from("/tmp/mock_account.json"),
+            project_id: Some("mock_project".to_string()),
+            subscription_tier: Some("FREE".to_string()),
+            model_quotas,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_should_skip_low_quota_account() {
+        let manager = TokenManager::new(PathBuf::from("/tmp"));
+
+        // Account A: 0.5% (below 1.0% threshold)
+        // Account B: 5.0% (above 1.0% threshold)
+        let token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.005);
+        let token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.05);
+
+        manager.tokens.insert("a".to_string(), token_a);
+        manager.tokens.insert("b".to_string(), token_b);
+
+        // Act: Request token with 1.0% threshold
+        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None).await;
+
+        // Assert: Should pick Account B
+        assert!(result.is_ok());
+        let (_, _, email) = result.unwrap();
+        assert_eq!(email, "b@example.com");
+    }
+
+    #[tokio::test]
+    async fn test_fallback_when_all_accounts_low_quota() {
+        let manager = TokenManager::new(PathBuf::from("/tmp"));
+
+        // Account A: 0.2%
+        // Account B: 0.8%
+        // Both are below 1.0% threshold
+        let token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.002);
+        let token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.008);
+
+        manager.tokens.insert("a".to_string(), token_a);
+        manager.tokens.insert("b".to_string(), token_b);
+
+        // Act: Request token with 1.0% threshold
+        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None).await;
+
+        // Assert: Should fallback to Account B (highest remaining quota)
+        assert!(result.is_ok());
+        let (_, _, email) = result.unwrap();
+        assert_eq!(email, "b@example.com");
+    }
+}

@@ -31,6 +31,7 @@ import { showToast } from '../components/common/ToastContainer';
 import { cn } from '../utils/cn';
 import { useProxyModels } from '../hooks/useProxyModels';
 import GroupedSelect, { SelectOption } from '../components/common/GroupedSelect';
+import MappingListBuilder from '../components/Settings/MappingListBuilder';
 
 interface ProxyStatus {
     running: boolean;
@@ -153,7 +154,7 @@ export default function ApiProxy() {
     const [zaiNewMappingTo, setZaiNewMappingTo] = useState('');
     const [customMappingValue, setCustomMappingValue] = useState(''); // 自定义映射表单的选中值
     const [editingKey, setEditingKey] = useState<string | null>(null);
-    const [editingValue, setEditingValue] = useState<string>('');
+    const [editingValue, setEditingValue] = useState<string | string[]>('');
 
     // Modal states
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -216,7 +217,7 @@ export default function ApiProxy() {
     };
 
     // 专门处理模型映射的热更新 (全量)
-    const handleMappingUpdate = async (type: 'custom', key: string, value: string) => {
+    const handleMappingUpdate = async (type: 'custom', key: string, value: string | string[]) => {
         if (!appConfig) return;
 
         console.log('[DEBUG] handleMappingUpdate called:', { type, key, value });
@@ -1237,73 +1238,92 @@ print(response.text)`;
                                                     {t('proxy.router.current_list')}
                                                 </span>
                                             </div>
-                                            <div className="overflow-y-auto max-h-[180px] border border-gray-100 dark:border-white/5 rounded-lg bg-gray-50/10 dark:bg-white/5 p-3" data-custom-mapping-list>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                                            <div className="overflow-y-auto max-h-[300px] border border-gray-100 dark:border-white/5 rounded-lg bg-gray-50/10 dark:bg-white/5 p-3" data-custom-mapping-list>
+                                                <div className="grid grid-cols-1 gap-3">
                                                     {appConfig.proxy.custom_mapping && Object.entries(appConfig.proxy.custom_mapping).length > 0 ? (
                                                         Object.entries(appConfig.proxy.custom_mapping).map(([key, val]) => (
-                                                            <div key={key} className={`flex items-center justify-between p-1.5 rounded-md transition-all border group ${editingKey === key ? 'bg-blue-50/80 dark:bg-blue-900/15 border-blue-300/50 dark:border-blue-500/30 shadow-sm' : 'border-transparent hover:bg-gray-100 dark:hover:bg-white/5 hover:border-gray-200 dark:hover:border-white/10'}`}>
-                                                                <div className="flex items-center gap-2.5 overflow-hidden flex-1">
-                                                                    <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 truncate max-w-[140px]" title={key}>{key}</span>
-                                                                    <ArrowRight size={10} className="text-gray-300 dark:text-gray-600 shrink-0" />
+                                                            <div key={key} className={`flex flex-col p-2 rounded-lg transition-all border group ${editingKey === key ? 'bg-blue-50/80 dark:bg-blue-900/15 border-blue-300/50 dark:border-blue-500/30 shadow-sm' : 'border-transparent hover:bg-gray-100 dark:hover:bg-white/5 hover:border-gray-200 dark:hover:border-white/10'}`}>
+                                                                <div className="flex items-start justify-between w-full">
+                                                                    <div className="flex items-center gap-2.5 overflow-hidden flex-1 min-w-0">
+                                                                        <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400 truncate max-w-[180px] shrink-0" title={key}>{key}</span>
+                                                                        <ArrowRight size={12} className="text-gray-300 dark:text-gray-600 shrink-0" />
 
-                                                                    {editingKey === key ? (
-                                                                        <div className="flex-1 mr-2">
-                                                                            <GroupedSelect
-                                                                                value={editingValue}
-                                                                                onChange={setEditingValue}
-                                                                                options={customMappingOptions}
-                                                                                placeholder="Select..."
-                                                                                className="font-mono text-[10px] h-7 dark:bg-gray-800 border-blue-200 dark:border-blue-800"
-                                                                            />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400 truncate cursor-pointer hover:text-blue-500"
-                                                                            onClick={() => { setEditingKey(key); setEditingValue(val); }}
-                                                                            title={val}>{val}</span>
-                                                                    )}
+                                                                        {editingKey === key ? (
+                                                                             // Edit Mode - Will be rendered below for full width
+                                                                             <span className="text-[10px] text-gray-400 italic">Editing chain...</span>
+                                                                        ) : (
+                                                                            <div className="flex flex-wrap gap-1 items-center">
+                                                                                {Array.isArray(val) ? (
+                                                                                    val.map((v, i) => (
+                                                                                        <div key={i} className="flex items-center">
+                                                                                            {i > 0 && <span className="text-gray-300 mx-1">→</span>}
+                                                                                            <span className="font-mono text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                                                                                {v}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    ))
+                                                                                ) : (
+                                                                                    <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-500"
+                                                                                        onClick={() => { setEditingKey(key); setEditingValue(val); }}
+                                                                                        title={val}>{val}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                                                        {editingKey === key ? (
+                                                                            <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-md border border-blue-200 dark:border-blue-800 p-0.5 shadow-sm">
+                                                                                <button
+                                                                                    className="btn btn-ghost btn-xs text-primary hover:bg-blue-50 dark:hover:bg-blue-900/30 p-0 h-6 w-6 min-h-0"
+                                                                                    onClick={() => {
+                                                                                        handleMappingUpdate('custom', key, editingValue);
+                                                                                        setEditingKey(null);
+                                                                                    }}
+                                                                                    title={t('common.save') || 'Save'}
+                                                                                >
+                                                                                    <Check size={14} strokeWidth={3} />
+                                                                                </button>
+                                                                                <div className="w-[1px] h-3 bg-gray-200 dark:bg-gray-700" />
+                                                                                <button
+                                                                                    className="btn btn-ghost btn-xs text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 p-0 h-6 w-6 min-h-0"
+                                                                                    onClick={() => setEditingKey(null)}
+                                                                                    title={t('common.cancel') || 'Cancel'}
+                                                                                >
+                                                                                    <X size={14} strokeWidth={3} />
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <button
+                                                                                    className="btn btn-ghost btn-xs text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-white/10 p-0 h-6 w-6 min-h-0"
+                                                                                    onClick={() => { setEditingKey(key); setEditingValue(val); }}
+                                                                                    title={t('common.edit') || 'Edit'}
+                                                                                >
+                                                                                    <Edit2 size={12} />
+                                                                                </button>
+                                                                                <button
+                                                                                    className="btn btn-ghost btn-xs text-error hover:bg-red-50 dark:hover:bg-red-900/20 p-0 h-6 w-6 min-h-0"
+                                                                                    onClick={() => handleRemoveCustomMapping(key)}
+                                                                                    title={t('common.delete') || 'Delete'}
+                                                                                >
+                                                                                    <Trash2 size={12} />
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
 
-                                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                                    {editingKey === key ? (
-                                                                        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-md border border-blue-200 dark:border-blue-800 p-0.5 shadow-sm">
-                                                                            <button
-                                                                                className="btn btn-ghost btn-xs text-primary hover:bg-blue-50 dark:hover:bg-blue-900/30 p-0 h-6 w-6 min-h-0"
-                                                                                onClick={() => {
-                                                                                    handleMappingUpdate('custom', key, editingValue);
-                                                                                    setEditingKey(null);
-                                                                                }}
-                                                                                title={t('common.save') || 'Save'}
-                                                                            >
-                                                                                <Check size={14} strokeWidth={3} />
-                                                                            </button>
-                                                                            <div className="w-[1px] h-3 bg-gray-200 dark:bg-gray-700" />
-                                                                            <button
-                                                                                className="btn btn-ghost btn-xs text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 p-0 h-6 w-6 min-h-0"
-                                                                                onClick={() => setEditingKey(null)}
-                                                                                title={t('common.cancel') || 'Cancel'}
-                                                                            >
-                                                                                <X size={14} strokeWidth={3} />
-                                                                            </button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <button
-                                                                                className="btn btn-ghost btn-xs text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-white/10 p-0 h-6 w-6 min-h-0"
-                                                                                onClick={() => { setEditingKey(key); setEditingValue(val); }}
-                                                                                title={t('common.edit') || 'Edit'}
-                                                                            >
-                                                                                <Edit2 size={12} />
-                                                                            </button>
-                                                                            <button
-                                                                                className="btn btn-ghost btn-xs text-error hover:bg-red-50 dark:hover:bg-red-900/20 p-0 h-6 w-6 min-h-0"
-                                                                                onClick={() => handleRemoveCustomMapping(key)}
-                                                                                title={t('common.delete') || 'Delete'}
-                                                                            >
-                                                                                <Trash2 size={12} />
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
+                                                                {/* Expanded Editor */}
+                                                                {editingKey === key && (
+                                                                    <div className="mt-2 w-full pl-6 border-l-2 border-blue-100 dark:border-blue-900/30">
+                                                                        <MappingListBuilder
+                                                                            value={editingValue}
+                                                                            onChange={setEditingValue}
+                                                                            modelOptions={customMappingOptions}
+                                                                        />
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))
                                                     ) : (
