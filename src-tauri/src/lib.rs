@@ -132,6 +132,10 @@ pub fn run() {
             // Autostart 命令
             commands::autostart::toggle_auto_launch,
             commands::autostart::is_auto_launch_enabled,
+            // Logging 命令
+            commands::logging::log_js_error,
+            commands::logging::open_logs_folder,
+            commands::logging::get_logs_path,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
