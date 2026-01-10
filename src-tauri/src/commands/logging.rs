@@ -1,53 +1,6 @@
 use tauri::command;
-use crate::modules::{crash_logger, logger};
+use crate::modules::logger;
 use tauri_plugin_opener::OpenerExt;
-
-/// JavaScript 错误记录命令
-#[command]
-pub async fn log_js_error(
-    message: String,
-    stack: String,
-    url: String,
-    line: u32,
-    column: u32,
-) -> Result<(), String> {
-    let log_dir = logger::get_log_dir()?;
-
-    // 收集系统信息
-    let sys_info = crash_logger::collect_system_info();
-
-    // 格式化日志内容
-    let timestamp = chrono::Local::now().to_rfc3339();
-    let content = format!(
-        "========== JS ERROR LOG ==========\n\
-         Time: {}\n\
-         Message: {}\n\
-         URL: {}\n\
-         Location: Line {}, Column {}\n\
-         \n\
-         Stack Trace:\n\
-         {}\n\
-         \n\
-         System Information:\n\
-         - OS: {} {}\n\
-         - App Version: {}\n\
-         ==================================\n\n",
-        timestamp,
-        message,
-        url,
-        line,
-        column,
-        stack,
-        sys_info.os_name,
-        sys_info.os_version,
-        sys_info.app_version,
-    );
-
-    // 写入日志
-    crash_logger::write_crash_log(&log_dir, content)?;
-
-    Ok(())
-}
 
 /// 打开日志目录命令
 #[command]

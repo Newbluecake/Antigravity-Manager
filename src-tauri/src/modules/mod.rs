@@ -2,7 +2,6 @@ pub mod account;
 pub mod quota;
 pub mod config;
 pub mod logger;
-pub mod crash_logger;
 pub mod db;
 pub mod process;
 pub mod oauth;

@@ -41,9 +41,6 @@ pub fn run() {
         .setup(|app| {
             info!("Setup starting...");
 
-            // 初始化崩溃日志 (在 setup 中初始化以确保 Tokio Runtime 已就绪)
-            modules::crash_logger::init_crash_logger(modules::crash_logger::CrashLoggerConfig::default());
-
             modules::tray::create_tray(app.handle())?;
             info!("Tray created");
             
@@ -134,7 +131,6 @@ pub fn run() {
             commands::autostart::toggle_auto_launch,
             commands::autostart::is_auto_launch_enabled,
             // Logging 命令
-            commands::logging::log_js_error,
             commands::logging::open_logs_folder,
             commands::logging::get_logs_path,
         ])
