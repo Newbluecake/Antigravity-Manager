@@ -30,11 +30,12 @@ export default function ModelMapping({ customMapping = {}, onChange }: ModelMapp
             } catch (error) {
                 console.error('Failed to fetch models:', error);
                 // Fallback options if fetch fails
-                setModelOptions([
-                    { label: 'Claude', options: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'].map(v => ({ label: v, value: v })) },
-                    { label: 'GPT', options: ['gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo'].map(v => ({ label: v, value: v })) },
-                    { label: 'Gemini', options: ['gemini-1.5-pro', 'gemini-1.5-flash'].map(v => ({ label: v, value: v })) }
-                ]);
+                const fallbackModels = [
+                    ...['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'].map(v => ({ label: v, value: v, group: 'Claude' })),
+                    ...['gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo'].map(v => ({ label: v, value: v, group: 'GPT' })),
+                    ...['gemini-1.5-pro', 'gemini-1.5-flash'].map(v => ({ label: v, value: v, group: 'Gemini' }))
+                ];
+                setModelOptions(fallbackModels);
             } finally {
                 setLoading(false);
             }
@@ -44,32 +45,26 @@ export default function ModelMapping({ customMapping = {}, onChange }: ModelMapp
     }, []);
 
     const groupModels = (models: string[]): SelectOption[] => {
-        const groups: Record<string, { label: string; value: string }[]> = {
-            'Claude': [],
-            'GPT': [],
-            'Gemini': [],
-            'Other': []
-        };
+        const options: SelectOption[] = [];
 
         models.forEach(model => {
-            const option = { label: model, value: model };
+            let group = 'Other';
             if (model.toLowerCase().includes('claude')) {
-                groups['Claude'].push(option);
+                group = 'Claude';
             } else if (model.toLowerCase().includes('gpt')) {
-                groups['GPT'].push(option);
+                group = 'GPT';
             } else if (model.toLowerCase().includes('gemini')) {
-                groups['Gemini'].push(option);
-            } else {
-                groups['Other'].push(option);
+                group = 'Gemini';
             }
+
+            options.push({
+                label: model,
+                value: model,
+                group
+            });
         });
 
-        return Object.entries(groups)
-            .filter(([_, opts]) => opts.length > 0)
-            .map(([label, options]) => ({
-                label,
-                options
-            }));
+        return options;
     };
 
     const handleAddMapping = () => {
@@ -144,24 +139,30 @@ export default function ModelMapping({ customMapping = {}, onChange }: ModelMapp
                 )}
             </div>
 
-            <div className="flex gap-2 items-center mt-4 p-3 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
-                <input
-                    type="text"
-                    value={newKey}
-                    onChange={(e) => setNewKey(e.target.value)}
-                    placeholder={t('settings.proxy.new_mapping_placeholder')} // e.g. "gpt-4-custom"
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-base-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-base-100 text-gray-900 dark:text-base-content font-mono"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddMapping()}
-                />
-                <button
-                    onClick={handleAddMapping}
-                    disabled={!newKey}
-                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm rounded-md transition-colors flex items-center gap-2"
-                >
-                    <Plus size={16} />
-                    {t('common.add')}
-                </button>
-            </div>
+                {loading ? (
+                    <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                    </div>
+                ) : (
+                    <div className="flex gap-2 items-center mt-4 p-3 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                        <input
+                            type="text"
+                            value={newKey}
+                            onChange={(e) => setNewKey(e.target.value)}
+                            placeholder={t('settings.proxy.new_mapping_placeholder')} // e.g. "gpt-4-custom"
+                            className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-base-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-base-100 text-gray-900 dark:text-base-content font-mono"
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddMapping()}
+                        />
+                        <button
+                            onClick={handleAddMapping}
+                            disabled={!newKey}
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm rounded-md transition-colors flex items-center gap-2"
+                        >
+                            <Plus size={16} />
+                            {t('common.add')}
+                        </button>
+                    </div>
+                )}
         </div>
     );
 }
