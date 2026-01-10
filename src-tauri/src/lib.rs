@@ -19,6 +19,9 @@ fn greet(name: &str) -> String {
 pub fn run() {
     // 初始化日志
     logger::init_logger();
+
+    // 初始化崩溃日志
+    modules::crash_logger::init_crash_logger(modules::crash_logger::CrashLoggerConfig::default());
     
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
