@@ -7,6 +7,7 @@ import { AppConfig } from '../types/config';
 import ModalDialog from '../components/common/ModalDialog';
 import { showToast } from '../components/common/ToastContainer';
 import ModelMapping from '../components/Settings/ModelMapping';
+import { ErrorLogger } from '../utils/errorLogger';
 
 import { useTranslation } from 'react-i18next';
 
@@ -39,6 +40,7 @@ function Settings() {
     // Dialog state
     const [isClearLogsOpen, setIsClearLogsOpen] = useState(false);
     const [dataDirPath, setDataDirPath] = useState<string>('~/.antigravity_tools/');
+    const [logsPath, setLogsPath] = useState<string>('Loading...');
 
     // Update check state
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -56,6 +58,14 @@ function Settings() {
         invoke<string>('get_data_dir_path')
             .then(path => setDataDirPath(path))
             .catch(err => console.error('Failed to get data dir:', err));
+
+        // 获取日志目录路径
+        ErrorLogger.getLogsPath()
+            .then(path => setLogsPath(path))
+            .catch(err => {
+                console.error('Failed to get logs path:', err);
+                setLogsPath('Error loading path');
+            });
     }, [loadConfig]);
 
     useEffect(() => {
@@ -522,6 +532,43 @@ function Settings() {
                                         onClick={() => setIsClearLogsOpen(true)}
                                     >
                                         {t('settings.advanced.clear_logs')}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Crash Logs Section */}
+                            <div className="border-t border-gray-200 dark:border-base-200 pt-4">
+                                <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">Crash Logs</h3>
+                                <div className="bg-gray-50 dark:bg-base-200 border border-gray-200 dark:border-base-300 rounded-lg p-3 mb-3">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Crash logs are stored locally for troubleshooting. Logs older than 7 days are automatically deleted.
+                                    </p>
+                                </div>
+
+                                {/* Log Directory Path */}
+                                <div className="mb-3">
+                                    <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-1">Log Directory</label>
+                                    <input
+                                        type="text"
+                                        value={logsPath}
+                                        readOnly
+                                        className="w-full px-4 py-2 border border-gray-200 dark:border-base-300 rounded-lg bg-gray-50 dark:bg-base-200 text-gray-900 dark:text-base-content font-mono text-sm"
+                                    />
+                                </div>
+
+                                {/* Open Log Folder Button */}
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        className="px-4 py-2 border border-gray-300 dark:border-base-300 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-base-200 transition-colors"
+                                        onClick={async () => {
+                                            try {
+                                                await ErrorLogger.openLogsFolder();
+                                            } catch (error) {
+                                                showToast(`Failed to open logs folder: ${error}`, 'error');
+                                            }
+                                        }}
+                                    >
+                                        Open Log Folder
                                     </button>
                                 </div>
                             </div>

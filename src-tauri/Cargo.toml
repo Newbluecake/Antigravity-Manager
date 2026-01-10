@@ -1,6 +1,6 @@
 [package]
 name = "antigravity_tools"
-version = "3.3.22"
+version = "3.4.0"
 description = "A Tauri App"
 authors = ["you"]
 license = "CC-BY-NC-SA-4.0"
@@ -62,3 +62,7 @@ tracing-appender = "0.2.4"
 tracing-log = "0.2.0"
 tauri-plugin-autostart = "2.5.1"
 sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"
+filetime = "0.2"
