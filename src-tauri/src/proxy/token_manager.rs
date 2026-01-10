@@ -1171,13 +1171,39 @@ mod tests {
         manager.tokens.insert("b".to_string(), token_b);
 
         // 1. First call (Priority Enabled) -> Should get A (0.1)
-        let result1 = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, true).await;
+        let result1 = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, true, None, true).await;
         assert!(result1.is_ok());
         assert_eq!(result1.unwrap().2, "a@example.com");
 
-        // 2. Second call (Priority Enabled) -> Should STILL get A (Greedy)
-        let result2 = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, true).await;
+        // 2. Second call (Priority Enabled) -> Should STILL get A (Greedy), even with force_rotate=true
+        // Because "force_rotate" just skips the sticky lock; Greedy strategy always starts from 0.
+        let result2 = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, true, None, true).await;
         assert!(result2.is_ok());
         assert_eq!(result2.unwrap().2, "a@example.com");
+    }
+
+    #[tokio::test]
+    async fn test_round_robin_when_priority_disabled() {
+        let manager = TokenManager::new(PathBuf::from("/tmp"));
+
+        // A: 0.1 (10%)
+        let token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.1);
+        // B: 0.1 (10%)
+        let token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.1);
+
+        manager.tokens.insert("a".to_string(), token_a);
+        manager.tokens.insert("b".to_string(), token_b);
+
+        // Run multiple times with priority DISABLED and force_rotate=true (to bypass 60s lock)
+        // -> Should rotate (Round Robin)
+        let mut seen = HashSet::new();
+        for _ in 0..10 {
+             let res = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, true, None, false).await;
+             if let Ok((_, _, email)) = res {
+                 seen.insert(email);
+             }
+        }
+
+        assert_eq!(seen.len(), 2, "Should have rotated through both accounts");
     }
 }
