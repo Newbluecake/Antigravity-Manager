@@ -6,6 +6,7 @@ import { useConfigStore } from '../stores/useConfigStore';
 import { AppConfig } from '../types/config';
 import ModalDialog from '../components/common/ModalDialog';
 import { showToast } from '../components/common/ToastContainer';
+import ModelMapping from '../components/Settings/ModelMapping';
 
 import { useTranslation } from 'react-i18next';
 
@@ -594,6 +595,20 @@ function Settings() {
                                         </p>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* 模型映射配置 */}
+                            <div className="p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                <ModelMapping
+                                    customMapping={formData.proxy?.custom_mapping}
+                                    onChange={(newMapping) => setFormData({
+                                        ...formData,
+                                        proxy: {
+                                            ...formData.proxy,
+                                            custom_mapping: newMapping
+                                        }
+                                    })}
+                                />
                             </div>
                         </div>
                     )}
