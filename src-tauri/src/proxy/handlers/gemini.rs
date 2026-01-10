@@ -65,7 +65,11 @@ pub async fn handle_generate(
         let session_id = SessionManager::extract_gemini_session_id(&body, &model_name);
 
         // 关键：在重试尝试 (attempt > 0) 时强制轮换账号
-        let quota_threshold = state.config.read().await.model_quota_threshold;
+        let (quota_threshold, quota_priority) = {
+            let cfg = state.config.read().await;
+            (cfg.model_quota_threshold, cfg.proxy.quota_priority_enabled)
+        };
+
         let (access_token, project_id, email) = match token_manager
             .get_token(
                 &config.request_type,
@@ -73,6 +77,7 @@ pub async fn handle_generate(
                 quota_threshold,
                 attempt > 0,
                 Some(&session_id),
+                quota_priority,
             )
             .await
         {
@@ -253,8 +258,11 @@ pub async fn handle_get_model(Path(model_name): Path<String>) -> impl IntoRespon
 
 pub async fn handle_count_tokens(State(state): State<AppState>, Path(model_name): Path<String>, Json(_body): Json<Value>) -> Result<impl IntoResponse, (StatusCode, String)> {
     let model_group = "gemini";
-    let quota_threshold = state.config.read().await.model_quota_threshold;
-    let (_access_token, _project_id, _) = state.token_manager.get_token(model_group, Some(&model_name), quota_threshold, false, None).await
+    let (quota_threshold, quota_priority) = {
+        let cfg = state.config.read().await;
+        (cfg.model_quota_threshold, cfg.proxy.quota_priority_enabled)
+    };
+    let (_access_token, _project_id, _) = state.token_manager.get_token(model_group, Some(&model_name), quota_threshold, false, None, quota_priority).await
         .map_err(|e| (StatusCode::SERVICE_UNAVAILABLE, format!("Token error: {}", e)))?;
 
     Ok(Json(json!({"totalTokens": 0})))

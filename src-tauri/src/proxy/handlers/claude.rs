@@ -530,7 +530,10 @@ pub async fn handle_messages(
         let session_id = Some(session_id_str.as_str());
 
         let force_rotate_token = attempt > 0;
-        let quota_threshold = state.config.read().await.model_quota_threshold;
+        let (quota_threshold, quota_priority) = {
+            let cfg = state.config.read().await;
+            (cfg.model_quota_threshold, cfg.proxy.quota_priority_enabled)
+        };
 
         let (access_token, project_id, email) = match token_manager
             .get_token(
@@ -539,6 +542,7 @@ pub async fn handle_messages(
                 quota_threshold,
                 force_rotate_token,
                 session_id,
+                quota_priority,
             )
             .await
         {

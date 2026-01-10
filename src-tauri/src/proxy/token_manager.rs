@@ -198,6 +198,7 @@ impl TokenManager {
     /// 参数 `model_name` 用于主动配额检查
     /// 参数 `force_rotate` 为 true 时将忽略锁定，强制切换账号
     /// 参数 `session_id` 用于跨请求维持会话粘性
+    /// 参数 `quota_priority_enabled` 是否启用配额优先策略 (默认 false)
     pub async fn get_token(
         &self,
         quota_group: &str,
@@ -205,12 +206,13 @@ impl TokenManager {
         quota_threshold: f64,
         force_rotate: bool,
         session_id: Option<&str>,
+        quota_priority_enabled: bool,
     ) -> Result<(String, String, String), String> {
         // 【优化 Issue #284】添加 5 秒超时，防止死锁
         let timeout_duration = std::time::Duration::from_secs(5);
         match tokio::time::timeout(
             timeout_duration,
-            self.get_token_internal(quota_group, model_name, quota_threshold, force_rotate, session_id),
+            self.get_token_internal(quota_group, model_name, quota_threshold, force_rotate, session_id, quota_priority_enabled),
         )
         .await
         {
@@ -229,6 +231,7 @@ impl TokenManager {
         quota_threshold: f64,
         force_rotate: bool,
         session_id: Option<&str>,
+        quota_priority_enabled: bool,
     ) -> Result<(String, String, String), String> {
         let mut tokens_snapshot: Vec<ProxyToken> = self.tokens.iter().map(|e| e.value().clone()).collect();
         let total = tokens_snapshot.len();
@@ -238,6 +241,7 @@ impl TokenManager {
 
         // ===== 【优化】根据订阅等级排序 (优先级: ULTRA > PRO > FREE) =====
         // 理由: ULTRA/PRO 重置快，优先消耗；FREE 重置慢，用于兜底
+        // 如果启用配额优先，则在同等级内按配额升序排序
         tokens_snapshot.sort_by(|a, b| {
             let tier_priority = |tier: &Option<String>| match tier.as_deref() {
                 Some("ULTRA") => 0,
@@ -245,7 +249,27 @@ impl TokenManager {
                 Some("FREE") => 2,
                 _ => 3,
             };
-            tier_priority(&a.subscription_tier).cmp(&tier_priority(&b.subscription_tier))
+            let tier_ord = tier_priority(&a.subscription_tier).cmp(&tier_priority(&b.subscription_tier));
+
+            if tier_ord != std::cmp::Ordering::Equal {
+                return tier_ord;
+            }
+
+            // 二级排序：配额优先 (如果启用且有模型名)
+            if quota_priority_enabled {
+                if let Some(model) = model_name {
+                    // 默认使用 2.0 (200%)，保证未知配额的账号排在已知配额账号(0.0-1.0)之后
+                    let quota_a = a.model_quotas.get(model).cloned().unwrap_or(2.0);
+                    let quota_b = b.model_quotas.get(model).cloned().unwrap_or(2.0);
+
+                    // 升序排列：配额越少越优先消耗
+                    if let Some(ord) = quota_a.partial_cmp(&quota_b) {
+                        return ord;
+                    }
+                }
+            }
+
+            std::cmp::Ordering::Equal
         });
 
         // 0. 读取当前调度配置
@@ -337,7 +361,14 @@ impl TokenManager {
 
                 // 若无锁定，则轮询选择新账号
                 if target_token.is_none() {
-                    let start_idx = self.current_index.fetch_add(1, Ordering::SeqCst) % total;
+                    // 如果启用了配额优先，则总是从排序后的第一个(即最优)账号开始尝试(Greedy)
+                    // 否则使用 Round-Robin
+                    let start_idx = if quota_priority_enabled {
+                        0
+                    } else {
+                        self.current_index.fetch_add(1, Ordering::SeqCst) % total
+                    };
+
                     let mut best_fallback: Option<(ProxyToken, f64)> = None;
 
                     for offset in 0..total {
@@ -394,7 +425,14 @@ impl TokenManager {
                 }
             } else if target_token.is_none() {
                 // 模式 C: 纯轮询模式 (Round-robin) 或强制轮换
-                let start_idx = self.current_index.fetch_add(1, Ordering::SeqCst) % total;
+                // 如果启用了配额优先，则总是从排序后的第一个(即最优)账号开始尝试(Greedy)
+                // 否则使用 Round-Robin
+                let start_idx = if quota_priority_enabled {
+                    0
+                } else {
+                    self.current_index.fetch_add(1, Ordering::SeqCst) % total
+                };
+
                 let mut best_fallback: Option<(ProxyToken, f64)> = None;
 
                 for offset in 0..total {
@@ -427,6 +465,15 @@ impl TokenManager {
                     if rotate {
                         tracing::debug!("Force Rotation: Switched to account: {}", candidate.email);
                     }
+
+                    // [QuotaPriority] 记录选择日志
+                    if quota_priority_enabled && model_name.is_some() {
+                         let model = model_name.unwrap();
+                         let quota_info = candidate.model_quotas.get(model).map(|&v| format!("{:.2}%", v * 100.0)).unwrap_or("unknown".to_string());
+                         tracing::debug!("[QuotaPriority] Selected account {} (tier: {:?}, quota: {})",
+                             candidate.email, candidate.subscription_tier, quota_info);
+                    }
+
                     break;
                 }
 
@@ -1022,7 +1069,7 @@ mod tests {
         manager.tokens.insert("b".to_string(), token_b);
 
         // Act: Request token with 1.0% threshold
-        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None).await;
+        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, false).await;
 
         // Assert: Should pick Account B
         assert!(result.is_ok());
@@ -1043,12 +1090,94 @@ mod tests {
         manager.tokens.insert("b".to_string(), token_b);
 
         // Act: Request token with 1.0% threshold
-        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None).await;
+        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, false).await;
 
         // Assert: Should fail with specific error
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("All accounts exhausted"));
         assert!(err.contains("Quota < 0.01%"));
+    }
+
+    #[tokio::test]
+    async fn test_quota_priority_sorting() {
+        let manager = TokenManager::new(PathBuf::from("/tmp"));
+
+        // A: ULTRA, 0.5 (50%)
+        let mut token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.5);
+        token_a.subscription_tier = Some("ULTRA".to_string());
+
+        // B: ULTRA, 0.2 (20%)
+        let mut token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.2);
+        token_b.subscription_tier = Some("ULTRA".to_string());
+
+        // C: PRO, 0.1 (10%)
+        let mut token_c = create_mock_token("c", "c@example.com", "claude-3-sonnet", 0.1);
+        token_c.subscription_tier = Some("PRO".to_string());
+
+        manager.tokens.insert("a".to_string(), token_a);
+        manager.tokens.insert("b".to_string(), token_b);
+        manager.tokens.insert("c".to_string(), token_c);
+
+        // Act: Request with quota priority ENABLED
+        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, true).await;
+
+        // Assert: Should pick B (ULTRA + Lowest Quota)
+        // A has higher quota (0.5 > 0.2)
+        // C is PRO, so it's lower priority than ULTRA
+        assert!(result.is_ok());
+        let (_, _, email) = result.unwrap();
+        assert_eq!(email, "b@example.com");
+    }
+
+    #[tokio::test]
+    async fn test_quota_missing_fallback() {
+        let manager = TokenManager::new(PathBuf::from("/tmp"));
+
+        // A: 0.2 (20%)
+        let mut token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.2);
+        token_a.subscription_tier = Some("ULTRA".to_string());
+
+        // B: Unknown Quota (defaults to 2.0/200%)
+        let mut token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.0);
+        token_b.subscription_tier = Some("ULTRA".to_string());
+        token_b.model_quotas.clear(); // Remove quota data
+
+        manager.tokens.insert("a".to_string(), token_a);
+        manager.tokens.insert("b".to_string(), token_b);
+
+        // Act: Request with quota priority ENABLED
+        let result = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, true).await;
+
+        // Assert: Should pick A (Known quota < Unknown)
+        assert!(result.is_ok());
+        let (_, _, email) = result.unwrap();
+        assert_eq!(email, "a@example.com");
+    }
+
+    #[tokio::test]
+    async fn test_priority_selection_flow() {
+        let manager = TokenManager::new(PathBuf::from("/tmp"));
+
+        // A: 0.1
+        let mut token_a = create_mock_token("a", "a@example.com", "claude-3-sonnet", 0.1);
+        token_a.subscription_tier = Some("ULTRA".to_string());
+
+        // B: 0.5
+        let mut token_b = create_mock_token("b", "b@example.com", "claude-3-sonnet", 0.5);
+        token_b.subscription_tier = Some("ULTRA".to_string());
+
+        manager.tokens.insert("a".to_string(), token_a);
+        manager.tokens.insert("b".to_string(), token_b);
+
+        // 1. First call (Priority Enabled) -> Should get A (0.1)
+        let result1 = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, true).await;
+        assert!(result1.is_ok());
+        assert_eq!(result1.unwrap().2, "a@example.com");
+
+        // 2. Second call (Priority Enabled) -> Should STILL get A (Greedy)
+        let result2 = manager.get_token("claude", Some("claude-3-sonnet"), 0.01, false, None, true).await;
+        assert!(result2.is_ok());
+        assert_eq!(result2.unwrap().2, "a@example.com");
     }
 }
