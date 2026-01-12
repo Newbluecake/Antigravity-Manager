@@ -3,7 +3,7 @@ use axum::{
     http::{header, StatusCode, Uri},
     middleware as axum_middleware,
     response::{IntoResponse, Redirect, Response},
-    routing::{get, post},
+    routing::{get, patch, post, put},
     Router,
 };
 use std::net::SocketAddr;
@@ -27,7 +27,7 @@ pub async fn start_server_standalone() -> Result<()> {
     start_server_with_context(ServiceContext::new()).await
 }
 
-async fn start_server_with_context(_context: ServiceContext) -> Result<()> {
+async fn start_server_with_context(context: ServiceContext) -> Result<()> {
     let port = 8046;
 
     // Load configuration to check for LAN access setting
@@ -46,6 +46,25 @@ async fn start_server_with_context(_context: ServiceContext) -> Result<()> {
     let ws_state = websocket::WebSocketState::new();
 
     // Build protected routes with auth middleware
+    #[cfg(feature = "desktop")]
+    let protected_routes = {
+        Router::new()
+            .route("/api/v1/dashboard/stats", get(handlers::dashboard::get_stats))
+            .route("/api/v1/accounts", get(handlers::account::list_accounts).post(handlers::account::add_account))
+            .route("/api/v1/accounts/:id", get(handlers::account::get_account).patch(handlers::account::update_account).delete(handlers::account::delete_account))
+            .route("/api/v1/accounts/:id/refresh", post(handlers::account::refresh_account))
+            .route("/api/v1/system/logs/files", get(handlers::system::list_log_files))
+            .route("/api/v1/system/logs", get(handlers::system::get_logs))
+            .route("/api/v1/proxy/status", get(handlers::proxy::get_status))
+            .route("/api/v1/proxy/start", post(handlers::proxy::start_proxy))
+            .route("/api/v1/proxy/stop", post(handlers::proxy::stop_proxy))
+            .route("/api/v1/proxy/restart", post(handlers::proxy::restart_proxy))
+            .route("/api/v1/proxy/config", get(handlers::proxy::get_config).put(handlers::proxy::update_config).patch(handlers::proxy::patch_config))
+            .layer(axum_middleware::from_fn(middleware::auth_middleware))
+            .with_state(context.app_handle.clone().unwrap())
+    };
+
+    #[cfg(not(feature = "desktop"))]
     let protected_routes = Router::new()
         .route("/api/v1/dashboard/stats", get(handlers::dashboard::get_stats))
         .route("/api/v1/accounts", get(handlers::account::list_accounts).post(handlers::account::add_account))
