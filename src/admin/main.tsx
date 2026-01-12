@@ -5,6 +5,7 @@ import { useAuthStore } from './store';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProxyPage } from './pages/ProxyPage';
+import { ProxyConfigPage } from './pages/ProxyConfigPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { LogsPage } from './pages/LogsPage';
 import { AdminLayout } from './components/AdminLayout';
@@ -39,6 +40,7 @@ function App() {
         >
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/proxy" element={<ProxyPage />} />
+          <Route path="/proxy-config" element={<ProxyConfigPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/logs" element={<LogsPage />} />
         </Route>
