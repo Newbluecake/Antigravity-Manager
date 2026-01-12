@@ -3,6 +3,7 @@
   "productName": "Antigravity Tools",
   "version": "3.4.2",
   "identifier": "com.lbjlaq.antigravity-tools",
+  "mainBinaryName": "antigravity_tools",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -29,7 +30,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "mainBinaryName": "antigravity_tools",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
