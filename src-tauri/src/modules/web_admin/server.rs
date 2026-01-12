@@ -44,25 +44,29 @@ async fn start_server_with_context(_context: ServiceContext) -> Result<()> {
     // Initialize WebSocket state
     let ws_state = websocket::WebSocketState::new();
 
-    // Build router without mixed states - use () as the unified state type
-    let app = Router::new()
-        .route("/health", get(health_check))
-        // Public routes
-        .route("/api/v1/auth/login", post(handlers::auth::login))
-        .route("/api/v1/ws", get(websocket::ws_handler))
-        // Protected routes (no state needed for server mode)
+    // Build protected routes with auth middleware
+    let protected_routes = Router::new()
         .route("/api/v1/dashboard/stats", get(handlers::dashboard::get_stats))
         .route("/api/v1/accounts", get(handlers::account::list_accounts).post(handlers::account::add_account))
         .route("/api/v1/accounts/:id", get(handlers::account::get_account).patch(handlers::account::update_account).delete(handlers::account::delete_account))
         .route("/api/v1/accounts/:id/refresh", post(handlers::account::refresh_account))
         .route("/api/v1/system/logs/files", get(handlers::system::list_log_files))
         .route("/api/v1/system/logs", get(handlers::system::get_logs))
-        // Static routes
+        .layer(axum_middleware::from_fn(middleware::auth_middleware));
+
+    // Build public routes (no auth required)
+    let public_routes = Router::new()
+        .route("/health", get(health_check))
+        .route("/api/v1/auth/login", post(handlers::auth::login))
+        .route("/api/v1/ws", get(websocket::ws_handler))
         .route("/", get(redirect_to_admin))
         .route("/admin", get(serve_admin_html))
         .route("/assets/*path", get(serve_asset))
-        .fallback(static_handler)
-        .layer(axum_middleware::from_fn(middleware::auth_middleware))
+        .fallback(static_handler);
+
+    // Combine routes
+    let app = public_routes
+        .merge(protected_routes)
         .with_state(ws_state);
 
     let listener = TcpListener::bind(addr).await?;
