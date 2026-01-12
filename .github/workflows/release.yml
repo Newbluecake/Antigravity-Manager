@@ -40,6 +40,10 @@ jobs:
           # Tauri 2 可能需要 libnm-dev
           sudo apt-get install -y libnm-dev xdg-utils
 
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: brew install create-dmg
+
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
         with:
