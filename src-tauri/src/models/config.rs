@@ -19,6 +19,8 @@ pub struct AppConfig {
     pub auto_launch: bool,  // 开机自动启动
     #[serde(default = "default_quota_threshold")]
     pub model_quota_threshold: f64, // 模型配额跳过阈值 (0.01 = 1%)
+    #[serde(default)]
+    pub web_admin_lan_access: bool, // 是否允许局域网访问 Web Admin
 }
 
 fn default_quota_threshold() -> f64 {
@@ -40,6 +42,7 @@ impl AppConfig {
             antigravity_args: None,
             auto_launch: false,
             model_quota_threshold: default_quota_threshold(),
+            web_admin_lan_access: false, // 默认禁止 LAN 访问
         }
     }
 }

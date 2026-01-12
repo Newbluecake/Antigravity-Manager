@@ -255,7 +255,11 @@
             "clear_logs": "清理日志缓存",
             "clear_logs_title": "清理日志确认",
             "clear_logs_msg": "确定要清理所有日志缓存文件吗？",
-            "logs_cleared": "日志缓存已清理"
+            "logs_cleared": "日志缓存已清理",
+            "web_admin_title": "Web Admin 后台设置",
+            "web_admin_lan_access": "允许局域网访问 Web Admin",
+            "web_admin_lan_access_desc": "开启后，局域网内的其他设备可以通过 http://[本机IP]:8046/admin 访问管理后台。请确保网络环境安全。",
+            "web_admin_restart_hint": "注意：修改此设置后需要重启应用才能生效。"
         },
         "about": {
             "title": "关于",

@@ -519,6 +519,27 @@ function Settings() {
                             </div>
 
                             <div className="border-t border-gray-200 dark:border-base-200 pt-4">
+                                <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.advanced.web_admin_title')}</h3>
+
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
+                                    <div className="flex-1 mr-4">
+                                        <div className="font-medium text-gray-900 dark:text-base-content">{t('settings.advanced.web_admin_lan_access')}</div>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('settings.advanced.web_admin_lan_access_desc')}</p>
+                                        <p className="text-xs text-orange-500 mt-1">{t('settings.advanced.web_admin_restart_hint')}</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={formData.web_admin_lan_access || false}
+                                            onChange={(e) => setFormData({ ...formData, web_admin_lan_access: e.target.checked })}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-gray-200 dark:border-base-200 pt-4">
                                 <h3 className="font-medium text-gray-900 dark:text-base-content mb-3">{t('settings.advanced.logs_title')}</h3>
                                 <div className="bg-gray-50 dark:bg-base-200 border border-gray-200 dark:border-base-300 rounded-lg p-3 mb-3">
                                     <p className="text-sm text-gray-600 dark:text-gray-400">{t('settings.advanced.logs_desc')}</p>

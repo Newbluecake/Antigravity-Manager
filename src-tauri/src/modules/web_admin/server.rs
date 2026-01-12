@@ -12,11 +12,20 @@ use tokio::net::TcpListener;
 use tracing::info;
 
 use crate::modules::web_admin::{assets::Assets, handlers, middleware, websocket, Result, WebAdminError};
+use crate::modules::config::load_app_config;
 
 pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
     let port = 8046;
-    // Default to 127.0.0.1 for safety, user can enable LAN later (T-502)
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+
+    // Load configuration to check for LAN access setting
+    let config = load_app_config().unwrap_or_default();
+    let bind_ip = if config.web_admin_lan_access {
+        [0, 0, 0, 0] // Listen on all interfaces
+    } else {
+        [127, 0, 0, 1] // Listen only on localhost
+    };
+
+    let addr = SocketAddr::from((bind_ip, port));
 
     info!("Starting Web Admin server on {}", addr);
 

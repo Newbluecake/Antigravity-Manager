@@ -63,5 +63,6 @@ export interface AppConfig {
     auto_launch?: boolean; // 开机自动启动
     accounts_page_size?: number; // 账号列表每页显示数量,默认 0 表示自动计算
     model_quota_threshold?: number; // 模型配额跳过阈值 (0.01 = 1%)
+    web_admin_lan_access?: boolean; // 是否允许局域网访问 Web Admin
     proxy: ProxyConfig;
 }

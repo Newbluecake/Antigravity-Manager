@@ -255,7 +255,11 @@
             "clear_logs": "Clear Logs Cache",
             "clear_logs_title": "Clear Logs Confirmation",
             "clear_logs_msg": "Are you sure you want to clear all log cache files?",
-            "logs_cleared": "Logs cache cleared"
+            "logs_cleared": "Logs cache cleared",
+            "web_admin_title": "Web Admin Settings",
+            "web_admin_lan_access": "Allow LAN Access to Web Admin",
+            "web_admin_lan_access_desc": "When enabled, other devices on the LAN can access the admin panel via http://[Local IP]:8046/admin. Please ensure your network is secure.",
+            "web_admin_restart_hint": "Note: Application restart is required for changes to take effect."
         },
         "about": {
             "title": "About",
