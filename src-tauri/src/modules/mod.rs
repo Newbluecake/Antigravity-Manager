@@ -10,6 +10,7 @@ pub mod migration;
 pub mod tray;
 pub mod i18n;
 pub mod proxy_db;
+pub mod web_admin;
 
 use crate::models;
 

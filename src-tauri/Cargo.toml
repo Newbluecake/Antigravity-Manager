@@ -40,7 +40,7 @@ image = "0.25.9"
 thiserror = "2.0.17"
 
 # 反代服务依赖
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.7", features = ["multipart", "ws"] }
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 
 hyper = { version = "1", features = ["full"] }
@@ -62,6 +62,8 @@ tracing-appender = "0.2.4"
 tracing-log = "0.2.0"
 tauri-plugin-autostart = "2.5.1"
 sha2 = "0.10"
+headers = "0.4.1"
+jsonwebtoken = { version = "10.2.0", features = ["use_pem", "aws_lc_rs"] }
 
 [dev-dependencies]
 tempfile = "3"

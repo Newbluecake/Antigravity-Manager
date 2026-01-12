@@ -43,7 +43,12 @@ pub fn run() {
 
             modules::tray::create_tray(app.handle())?;
             info!("Tray created");
-            
+
+            // 初始化 Web Admin 模块
+            if let Err(e) = modules::web_admin::init(app.handle()) {
+                error!("Failed to initialize Web Admin: {}", e);
+            }
+
             // 自动启动反代服务
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
