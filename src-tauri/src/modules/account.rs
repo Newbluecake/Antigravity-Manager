@@ -18,16 +18,24 @@ const ACCOUNTS_DIR: &str = "accounts";
 
 // ... existing functions get_data_dir, get_accounts_dir, load_account_index, save_account_index ...
 /// 获取数据目录路径
+///
+/// 优先级：
+/// 1. ANTIGRAVITY_DATA_DIR 环境变量（用于 Docker/服务器模式）
+/// 2. ~/.antigravity_tools（默认位置）
 pub fn get_data_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
-    let data_dir = home.join(DATA_DIR);
-    
+    let data_dir = if let Ok(custom_dir) = std::env::var("ANTIGRAVITY_DATA_DIR") {
+        PathBuf::from(custom_dir)
+    } else {
+        let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+        home.join(DATA_DIR)
+    };
+
     // 确保目录存在
     if !data_dir.exists() {
         fs::create_dir_all(&data_dir)
             .map_err(|e| format!("创建数据目录失败: {}", e))?;
     }
-    
+
     Ok(data_dir)
 }
 
@@ -100,13 +108,24 @@ pub fn load_account(account_id: &str) -> Result<Account, String> {
 }
 
 /// 保存账号数据
+///
+/// 在服务器模式下，自动加密 tokens 后再保存
 pub fn save_account(account: &Account) -> Result<(), String> {
     let accounts_dir = get_accounts_dir()?;
     let account_path = accounts_dir.join(format!("{}.json", account.id));
-    
-    let content = serde_json::to_string_pretty(account)
+
+    // Clone account to avoid modifying the original
+    let mut account_to_save = account.clone();
+
+    // In server mode or when encryption is enabled, ensure tokens are encrypted
+    if crate::modules::crypto::is_encryption_enabled() && !account_to_save.token.encrypted {
+        account_to_save.token.encrypt_tokens()
+            .map_err(|e| format!("加密 token 失败: {}", e))?;
+    }
+
+    let content = serde_json::to_string_pretty(&account_to_save)
         .map_err(|e| format!("序列化账号数据失败: {}", e))?;
-    
+
     fs::write(&account_path, content)
         .map_err(|e| format!("保存账号数据失败: {}", e))
 }
