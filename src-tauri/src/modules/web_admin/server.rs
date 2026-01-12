@@ -10,6 +10,7 @@ use std::net::SocketAddr;
 #[cfg(feature = "desktop")]
 use tauri::AppHandle;
 use tokio::net::TcpListener;
+use tower_http::cors::{CorsLayer, Any};
 use tracing::info;
 use rust_embed::Embed;
 
@@ -64,9 +65,17 @@ async fn start_server_with_context(_context: ServiceContext) -> Result<()> {
         .route("/assets/*path", get(serve_asset))
         .fallback(static_handler);
 
+    // Create CORS layer
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_credentials(false);
+
     // Combine routes
     let app = public_routes
         .merge(protected_routes)
+        .layer(cors)
         .with_state(ws_state);
 
     let listener = TcpListener::bind(addr).await?;
