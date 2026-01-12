@@ -1,4 +1,4 @@
-import { Settings, Clock, FileText, Power, Globe, Zap } from 'lucide-react';
+import { Settings, Clock, FileText, Power, Globe } from 'lucide-react';
 import type { ProxyConfig } from '../../types/proxy';
 import { CollapsibleCard } from './shared/CollapsibleCard';
 
@@ -149,47 +149,6 @@ export function AdvancedSettings({ config, onConfigChange }: AdvancedSettingsPro
           )}
           <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
             Route all proxy requests through this upstream proxy
-          </p>
-        </div>
-
-        {/* Experimental Features */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Zap className="w-4 h-4 text-yellow-500" />
-            <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Experimental Features
-            </h4>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-2 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <div>
-                <div className="text-xs font-medium text-gray-900 dark:text-white">
-                  Extended Thinking Tokens
-                </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                  Enable extended thinking mode for supported models
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                className="toggle toggle-sm bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600
-                         checked:bg-yellow-500 checked:border-yellow-500"
-                checked={config?.experimental?.thinking_tokens ?? false}
-                onChange={(e) =>
-                  onConfigChange({
-                    experimental: {
-                      ...config?.experimental,
-                      thinking_tokens: e.target.checked,
-                    },
-                  })
-                }
-              />
-            </div>
-          </div>
-
-          <p className="mt-2 text-[10px] text-yellow-600 dark:text-yellow-500">
-            ⚠️ Experimental features may be unstable and change without notice
           </p>
         </div>
       </div>

@@ -7,6 +7,9 @@ import { ModelMappingConfig } from '../components/ProxyConfig/ModelMappingConfig
 import { StickySessionConfig } from '../components/ProxyConfig/StickySessionConfig';
 import { AdvancedSettings } from '../components/ProxyConfig/AdvancedSettings';
 import { ConfigImportExport } from '../components/ProxyConfig/ConfigImportExport';
+import { TokenManagerConfig } from '../components/ProxyConfig/TokenManagerConfig';
+import { ZaiIntegrationConfig } from '../components/ProxyConfig/ZaiIntegrationConfig';
+import { ExperimentalFeaturesConfig } from '../components/ProxyConfig/ExperimentalFeaturesConfig';
 
 export function ProxyConfigPage() {
   const { config, loading: configLoading, error: configError, loadConfig, updatePartial } = useProxyConfig();
@@ -137,8 +140,26 @@ export function ProxyConfigPage() {
             onConfigChange={handleConfigChange}
           />
 
+          {/* Token Management */}
+          <TokenManagerConfig
+            config={config}
+            onConfigChange={handleConfigChange}
+          />
+
+          {/* Z.ai Integration */}
+          <ZaiIntegrationConfig
+            config={config}
+            onConfigChange={handleConfigChange}
+          />
+
           {/* Advanced Settings */}
           <AdvancedSettings
+            config={config}
+            onConfigChange={handleConfigChange}
+          />
+
+          {/* Experimental Features */}
+          <ExperimentalFeaturesConfig
             config={config}
             onConfigChange={handleConfigChange}
           />
@@ -165,6 +186,8 @@ export function ProxyConfigPage() {
                   <li>Model Mapping: Map request model names to actual provider models</li>
                   <li>Fallback Chain: Configure backup models if primary fails</li>
                   <li>Sticky Session: Maintain conversation context with account binding</li>
+                  <li>Token Management: Control usage limits and costs</li>
+                  <li>Z.ai Integration: Use Z.ai models directly</li>
                 </ul>
               </div>
             </div>
