@@ -45,6 +45,12 @@ async fn start_server_with_context(context: ServiceContext) -> Result<()> {
     // Initialize WebSocket state
     let ws_state = websocket::WebSocketState::new();
 
+    #[cfg(feature = "desktop")]
+    if let Some(app) = &context.app_handle {
+        use tauri::Manager;
+        app.manage(ws_state.clone());
+    }
+
     // Build protected routes with auth middleware
     #[cfg(feature = "desktop")]
     let protected_routes = {
@@ -60,6 +66,8 @@ async fn start_server_with_context(context: ServiceContext) -> Result<()> {
             .route("/api/v1/proxy/stop", post(handlers::proxy::stop_proxy))
             .route("/api/v1/proxy/restart", post(handlers::proxy::restart_proxy))
             .route("/api/v1/proxy/config", get(handlers::proxy::get_config).put(handlers::proxy::update_config).patch(handlers::proxy::patch_config))
+            .route("/api/v1/proxy/config/export", post(handlers::proxy::export_config))
+            .route("/api/v1/proxy/config/import", post(handlers::proxy::import_config))
             .layer(axum_middleware::from_fn(middleware::auth_middleware))
             .with_state(context.app_handle.clone().unwrap())
     };

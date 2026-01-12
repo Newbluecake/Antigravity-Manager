@@ -1,11 +1,28 @@
 #![cfg(feature = "desktop")]
 
-use axum::{extract::State, Json};
+use axum::{
+    extract::State,
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
+use axum::extract::Multipart;
 use tauri::{AppHandle, Manager};
 
 use crate::commands::proxy::{self, ProxyServiceState, ProxyStatus};
-use crate::modules::web_admin::{Result, WebAdminError};
+use crate::modules::web_admin::{websocket::{WebSocketEvent, WebSocketState}, Result, WebAdminError};
 use crate::proxy::ProxyConfig;
+
+// Helper to broadcast status updates via WebSocket
+fn broadcast_status(app: &AppHandle, status: &ProxyStatus) {
+    if let Some(ws_state) = app.try_state::<WebSocketState>() {
+        let event = WebSocketEvent {
+            event_type: "proxy_status_update".to_string(),
+            data: serde_json::to_value(status).unwrap_or(serde_json::Value::Null),
+        };
+        ws_state.broadcast(event);
+    }
+}
 
 /// GET /api/v1/proxy/status
 pub async fn get_status(
@@ -43,7 +60,10 @@ pub async fn start_proxy(
     let state = app.state::<ProxyServiceState>();
 
     match proxy::start_proxy_service(config, state, app.clone()).await {
-        Ok(status) => Ok(Json(status)),
+        Ok(status) => {
+            broadcast_status(&app, &status);
+            Ok(Json(status))
+        },
         Err(e) => Err(WebAdminError::ServerError(e)),
     }
 }
@@ -55,7 +75,16 @@ pub async fn stop_proxy(
     let state = app.state::<ProxyServiceState>();
 
     match proxy::stop_proxy_service(state).await {
-        Ok(_) => Ok(Json(())),
+        Ok(_) => {
+            let status = ProxyStatus {
+                running: false,
+                port: 0,
+                base_url: String::new(),
+                active_accounts: 0,
+            };
+            broadcast_status(&app, &status);
+            Ok(Json(()))
+        },
         Err(e) => Err(WebAdminError::ServerError(e)),
     }
 }
@@ -80,7 +109,10 @@ pub async fn restart_proxy(
 
     // Start with the loaded config
     match proxy::start_proxy_service(config, state.clone(), app.clone()).await {
-        Ok(status) => Ok(Json(status)),
+        Ok(status) => {
+            broadcast_status(&app, &status);
+            Ok(Json(status))
+        },
         Err(e) => Err(WebAdminError::ServerError(e)),
     }
 }
@@ -142,6 +174,77 @@ pub async fn patch_config(
 
     // Update app config
     app_config.proxy = updated_config;
+
+    // Save to file
+    crate::modules::config::save_app_config(&app_config)
+        .map_err(|e| WebAdminError::ServerError(e))?;
+
+    Ok(Json(()))
+}
+
+/// POST /api/v1/proxy/config/export
+pub async fn export_config(
+    State(_app): State<AppHandle>,
+) -> Result<Response> {
+    // Load current app config
+    let app_config = crate::modules::config::load_app_config()
+        .map_err(|e| WebAdminError::ServerError(e))?;
+
+    // Serialize proxy config to JSON
+    let json = serde_json::to_string_pretty(&app_config.proxy)
+        .map_err(|e| WebAdminError::ServerError(e.to_string()))?;
+
+    // Create response with JSON download
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!(
+                "attachment; filename=\"proxy-config-{}.json\"",
+                chrono::Local::now().format("%Y-%m-%d")
+            ),
+        )
+        .body(axum::body::Body::from(json))
+        .map_err(|e| WebAdminError::ServerError(e.to_string()))?;
+
+    Ok(response)
+}
+
+/// POST /api/v1/proxy/config/import
+pub async fn import_config(
+    State(_app): State<AppHandle>,
+    mut multipart: Multipart,
+) -> Result<Json<()>> {
+    // Extract file from multipart form
+    let mut config_json: Option<String> = None;
+
+    while let Some(field) = multipart.next_field().await
+        .map_err(|e| WebAdminError::BadRequest(e.to_string()))? {
+
+        if field.name() == Some("file") {
+            let data = field.bytes().await
+                .map_err(|e| WebAdminError::BadRequest(e.to_string()))?;
+
+            config_json = Some(String::from_utf8(data.to_vec())
+                .map_err(|e| WebAdminError::BadRequest(format!("Invalid UTF-8: {}", e)))?);
+            break;
+        }
+    }
+
+    let config_json = config_json
+        .ok_or_else(|| WebAdminError::BadRequest("No file uploaded".to_string()))?;
+
+    // Parse JSON to ProxyConfig
+    let imported_config: ProxyConfig = serde_json::from_str(&config_json)
+        .map_err(|e| WebAdminError::BadRequest(format!("Invalid JSON: {}", e)))?;
+
+    // Load current app config
+    let mut app_config = crate::modules::config::load_app_config()
+        .map_err(|e| WebAdminError::ServerError(e))?;
+
+    // Replace proxy config
+    app_config.proxy = imported_config;
 
     // Save to file
     crate::modules::config::save_app_config(&app_config)

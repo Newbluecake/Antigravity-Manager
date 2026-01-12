@@ -4,6 +4,9 @@ import { useProxyConfig } from '../hooks/useProxyConfig';
 import { useProxyStatus } from '../hooks/useProxyStatus';
 import { ProxyControlPanel } from '../components/ProxyConfig/ProxyControlPanel';
 import { ModelMappingConfig } from '../components/ProxyConfig/ModelMappingConfig';
+import { StickySessionConfig } from '../components/ProxyConfig/StickySessionConfig';
+import { AdvancedSettings } from '../components/ProxyConfig/AdvancedSettings';
+import { ConfigImportExport } from '../components/ProxyConfig/ConfigImportExport';
 
 export function ProxyConfigPage() {
   const { config, loading: configLoading, error: configError, loadConfig, updatePartial } = useProxyConfig();
@@ -27,6 +30,11 @@ export function ProxyConfigPage() {
     } else {
       setSaveError(result.error || 'Failed to save configuration');
     }
+  };
+
+  const handleConfigImported = () => {
+    loadConfig();
+    refresh();
   };
 
   const handleStart = async () => {
@@ -123,6 +131,24 @@ export function ProxyConfigPage() {
             onConfigChange={handleConfigChange}
           />
 
+          {/* Sticky Session Configuration */}
+          <StickySessionConfig
+            config={config}
+            onConfigChange={handleConfigChange}
+          />
+
+          {/* Advanced Settings */}
+          <AdvancedSettings
+            config={config}
+            onConfigChange={handleConfigChange}
+          />
+
+          {/* Config Import/Export */}
+          <ConfigImportExport
+            config={config}
+            onConfigImported={handleConfigImported}
+          />
+
           {/* Information */}
           <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
             <div className="flex items-start gap-3">
@@ -138,6 +164,7 @@ export function ProxyConfigPage() {
                   <li>Bind Address: 127.0.0.1 (local only) or 0.0.0.0 (network accessible)</li>
                   <li>Model Mapping: Map request model names to actual provider models</li>
                   <li>Fallback Chain: Configure backup models if primary fails</li>
+                  <li>Sticky Session: Maintain conversation context with account binding</li>
                 </ul>
               </div>
             </div>
