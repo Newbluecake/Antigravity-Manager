@@ -46,8 +46,8 @@ pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
         .route("/proxy/start", post(handlers::proxy::start_proxy))
         .route("/proxy/stop", post(handlers::proxy::stop_proxy))
         // Account routes
-        .route("/accounts", get(handlers::account::list_accounts))
-        .route("/accounts/:id", get(handlers::account::get_account).patch(handlers::account::update_account))
+        .route("/accounts", get(handlers::account::list_accounts).post(handlers::account::add_account))
+        .route("/accounts/:id", get(handlers::account::get_account).patch(handlers::account::update_account).delete(handlers::account::delete_account))
         .route("/accounts/:id/refresh", post(handlers::account::refresh_account))
         // System routes
         .route("/system/logs/files", get(handlers::system::list_log_files))

@@ -4,7 +4,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Account, AccountSummary};
+use crate::models::{Account, AccountSummary, TokenData};
 use crate::modules::account;
 use crate::modules::web_admin::{Result, WebAdminError};
 
@@ -82,4 +82,60 @@ pub async fn update_account(
         .map_err(|e| WebAdminError::ServerError(e))?;
 
     Ok(Json(updated_account))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddAccountRequest {
+    /// Refresh token (required)
+    pub refresh_token: String,
+    /// Optional account name
+    pub name: Option<String>,
+}
+
+/// POST /api/v1/accounts
+/// Add a new account via refresh token
+pub async fn add_account(
+    Json(payload): Json<AddAccountRequest>,
+) -> Result<Json<Account>> {
+    // Validate refresh token format (basic check)
+    if payload.refresh_token.is_empty() {
+        return Err(WebAdminError::BadRequest("Refresh token cannot be empty".to_string()));
+    }
+
+    // Exchange refresh token for access token
+    let token_response = crate::modules::oauth::refresh_access_token(&payload.refresh_token).await
+        .map_err(|e| WebAdminError::ServerError(format!("Failed to exchange refresh token: {}", e)))?;
+
+    // Get user info to extract email
+    let user_info = crate::modules::oauth::get_user_info(&token_response.access_token).await
+        .map_err(|e| WebAdminError::ServerError(format!("Failed to get user info: {}", e)))?;
+
+    let email = user_info.email;
+
+    // Create TokenData with the refresh token from request (not response, as refresh endpoint doesn't return it)
+    let token = TokenData::new(
+        token_response.access_token,
+        payload.refresh_token,
+        token_response.expires_in,
+        Some(email.clone()),
+        None, // project_id will be generated on first use
+        None, // session_id will be generated on first use
+    );
+
+    // Add account using existing logic
+    let account = account::upsert_account(email, payload.name, token)
+        .map_err(|e| WebAdminError::ServerError(e))?;
+
+    Ok(Json(account))
+}
+
+/// DELETE /api/v1/accounts/:id
+/// Delete an account by ID
+pub async fn delete_account(
+    Path(id): Path<String>,
+) -> Result<Json<()>> {
+    account::delete_account(&id)
+        .map_err(|e| WebAdminError::ServerError(e))?;
+
+    Ok(Json(()))
 }

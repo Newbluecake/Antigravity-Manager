@@ -24,6 +24,9 @@ pub enum WebAdminError {
     #[error("Authentication failed: {0}")]
     AuthError(String),
 
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
@@ -41,6 +44,7 @@ impl IntoResponse for WebAdminError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             WebAdminError::AuthError(msg) => (StatusCode::UNAUTHORIZED, msg),
+            WebAdminError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             WebAdminError::ConfigError(msg) => (StatusCode::BAD_REQUEST, msg),
             WebAdminError::DatabaseError(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             WebAdminError::JwtError(e) => (StatusCode::UNAUTHORIZED, e.to_string()),

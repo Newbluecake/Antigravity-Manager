@@ -6,6 +6,7 @@ pub mod db;
 pub mod handlers;
 pub mod middleware;
 pub mod websocket;
+pub mod context;
 
 use tauri::AppHandle;
 use tracing::info;
