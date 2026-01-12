@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use std::collections::VecDeque;
 use tokio::sync::RwLock;
+#[cfg(feature = "desktop")]
 use tauri::Emitter;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -34,11 +35,12 @@ pub struct ProxyMonitor {
     pub stats: RwLock<ProxyStats>,
     pub max_logs: usize,
     pub enabled: AtomicBool,
+    #[cfg(feature = "desktop")]
     app_handle: Option<tauri::AppHandle>,
 }
 
 impl ProxyMonitor {
-    pub fn new(max_logs: usize, app_handle: Option<tauri::AppHandle>) -> Self {
+    pub fn new(max_logs: usize, #[cfg(feature = "desktop")] app_handle: Option<tauri::AppHandle>) -> Self {
         // Initialize DB
         if let Err(e) = crate::modules::proxy_db::init_db() {
             tracing::error!("Failed to initialize proxy DB: {}", e);
@@ -49,6 +51,7 @@ impl ProxyMonitor {
             stats: RwLock::new(ProxyStats::default()),
             max_logs,
             enabled: AtomicBool::new(false), // Default to disabled
+            #[cfg(feature = "desktop")]
             app_handle,
         }
     }
@@ -95,6 +98,7 @@ impl ProxyMonitor {
         });
 
         // Emit event
+        #[cfg(feature = "desktop")]
         if let Some(app) = &self.app_handle {
              let _ = app.emit("proxy://request", &log);
         }

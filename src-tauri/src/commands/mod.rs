@@ -1,5 +1,6 @@
 use crate::models::{Account, AppConfig, QuotaData, TokenData};
 use crate::modules;
+#[cfg(feature = "desktop")]
 use tauri::{Emitter, Manager};
 
 // 导出 proxy 命令
@@ -10,12 +11,14 @@ pub mod autostart;
 pub mod logging;
 
 /// 列出所有账号
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn list_accounts() -> Result<Vec<Account>, String> {
     modules::list_accounts()
 }
 
 /// 添加账号
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn add_account(
     app: tauri::AppHandle,
@@ -59,6 +62,7 @@ pub async fn add_account(
 }
 
 /// 删除账号
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn delete_account(app: tauri::AppHandle, account_id: String) -> Result<(), String> {
     modules::logger::log_info(&format!("收到删除账号请求: {}", account_id));
@@ -74,6 +78,7 @@ pub async fn delete_account(app: tauri::AppHandle, account_id: String) -> Result
 }
 
 /// 批量删除账号
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn delete_accounts(
     app: tauri::AppHandle,
@@ -95,6 +100,7 @@ pub async fn delete_accounts(
 
 /// 重新排序账号列表
 /// 根据传入的账号ID数组顺序更新账号排列
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn reorder_accounts(account_ids: Vec<String>) -> Result<(), String> {
     modules::logger::log_info(&format!("收到账号重排序请求，共 {} 个账号", account_ids.len()));
@@ -105,6 +111,7 @@ pub async fn reorder_accounts(account_ids: Vec<String>) -> Result<(), String> {
 }
 
 /// 切换账号
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn switch_account(app: tauri::AppHandle, account_id: String) -> Result<(), String> {
     let res = modules::switch_account(&account_id).await;
@@ -115,6 +122,7 @@ pub async fn switch_account(app: tauri::AppHandle, account_id: String) -> Result
 }
 
 /// 获取当前账号
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn get_current_account() -> Result<Option<Account>, String> {
     // println!("🚀 Backend Command: get_current_account called"); // Commented out to reduce noise for frequent calls, relies on frontend log for frequency
@@ -133,6 +141,7 @@ pub async fn get_current_account() -> Result<Option<Account>, String> {
 }
 
 /// 内部辅助功能：在添加或导入账号后自动刷新一次额度
+#[cfg(feature = "desktop")]
 async fn internal_refresh_account_quota(
     app: &tauri::AppHandle,
     account: &mut Account,
@@ -165,6 +174,7 @@ async fn internal_refresh_account_quota(
 }
 
 /// 查询账号配额
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn fetch_account_quota(
     app: tauri::AppHandle,
@@ -194,6 +204,7 @@ pub async fn fetch_account_quota(
     Ok(quota)
 }
 
+#[cfg(feature = "desktop")]
 #[derive(serde::Serialize)]
 pub struct RefreshStats {
     total: usize,
@@ -203,6 +214,7 @@ pub struct RefreshStats {
 }
 
 /// 刷新所有账号配额
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn refresh_all_quotas(app: tauri::AppHandle) -> Result<RefreshStats, String> {
     use futures::future::join_all;
@@ -306,12 +318,14 @@ pub async fn refresh_all_quotas(app: tauri::AppHandle) -> Result<RefreshStats, S
 }
 
 /// 加载配置
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn load_config() -> Result<AppConfig, String> {
     modules::load_app_config()
 }
 
 /// 保存配置
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn save_config(
     app: tauri::AppHandle,
@@ -345,6 +359,7 @@ pub async fn save_config(
 
 // --- OAuth 命令 ---
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn start_oauth_login(app_handle: tauri::AppHandle) -> Result<Account, String> {
     modules::logger::log_info("开始 OAuth 授权流程...");
@@ -411,6 +426,7 @@ pub async fn start_oauth_login(app_handle: tauri::AppHandle) -> Result<Account, 
 }
 
 /// 完成 OAuth 授权（不自动打开浏览器）
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn complete_oauth_login(app_handle: tauri::AppHandle) -> Result<Account, String> {
     modules::logger::log_info("完成 OAuth 授权流程 (manual)...");
@@ -477,11 +493,13 @@ pub async fn complete_oauth_login(app_handle: tauri::AppHandle) -> Result<Accoun
 }
 
 /// 预生成 OAuth 授权链接 (不打开浏览器)
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn prepare_oauth_url(app_handle: tauri::AppHandle) -> Result<String, String> {
     crate::modules::oauth_server::prepare_oauth_url(app_handle).await
 }
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn cancel_oauth_login() -> Result<(), String> {
     modules::oauth_server::cancel_oauth_flow();
@@ -490,6 +508,7 @@ pub async fn cancel_oauth_login() -> Result<(), String> {
 
 // --- 导入命令 ---
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn import_v1_accounts(app: tauri::AppHandle) -> Result<Vec<Account>, String> {
     let accounts = modules::migration::import_from_v1().await?;
@@ -502,6 +521,7 @@ pub async fn import_v1_accounts(app: tauri::AppHandle) -> Result<Vec<Account>, S
     Ok(accounts)
 }
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn import_from_db(app: tauri::AppHandle) -> Result<Account, String> {
     // 同步函数包装为 async
@@ -520,6 +540,7 @@ pub async fn import_from_db(app: tauri::AppHandle) -> Result<Account, String> {
     Ok(account)
 }
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 #[allow(dead_code)]
 pub async fn import_custom_db(app: tauri::AppHandle, path: String) -> Result<Account, String> {
@@ -539,6 +560,7 @@ pub async fn import_custom_db(app: tauri::AppHandle, path: String) -> Result<Acc
     Ok(account)
 }
 
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn sync_account_from_db(app: tauri::AppHandle) -> Result<Option<Account>, String> {
     // 1. 获取 DB 中的 Refresh Token
@@ -574,18 +596,21 @@ pub async fn sync_account_from_db(app: tauri::AppHandle) -> Result<Option<Accoun
 }
 
 /// 保存文本文件 (绕过前端 Scope 限制)
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn save_text_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| format!("写入文件失败: {}", e))
 }
 
 /// 清理日志缓存
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn clear_log_cache() -> Result<(), String> {
     modules::logger::clear_logs()
 }
 
 /// 打开数据目录
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn open_data_folder() -> Result<(), String> {
     let path = modules::account::get_data_dir()?;
@@ -618,6 +643,7 @@ pub async fn open_data_folder() -> Result<(), String> {
 }
 
 /// 获取数据目录绝对路径
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn get_data_dir_path() -> Result<String, String> {
     let path = modules::account::get_data_dir()?;
@@ -625,12 +651,14 @@ pub async fn get_data_dir_path() -> Result<String, String> {
 }
 
 /// 显示主窗口
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn show_main_window(window: tauri::Window) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())
 }
 
 /// 获取 Antigravity 可执行文件路径
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn get_antigravity_path(bypass_config: Option<bool>) -> Result<String, String> {
     // 1. 优先从配置查询 (除非明确要求绕过)
@@ -652,6 +680,7 @@ pub async fn get_antigravity_path(bypass_config: Option<bool>) -> Result<String,
 }
 
 /// 获取 Antigravity 启动参数
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn get_antigravity_args() -> Result<Vec<String>, String> {
     match crate::modules::process::get_args_from_running_process() {
@@ -670,6 +699,7 @@ pub struct UpdateInfo {
 }
 
 /// 检测 GitHub releases 更新
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn check_for_updates() -> Result<UpdateInfo, String> {
     const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -724,6 +754,7 @@ pub async fn check_for_updates() -> Result<UpdateInfo, String> {
 }
 
 /// 简单的版本号比较 (假设格式为 x.y.z)
+#[cfg(feature = "desktop")]
 fn compare_versions(latest: &str, current: &str) -> bool {
     let parse_version =
         |v: &str| -> Vec<u32> { v.split('.').filter_map(|s| s.parse::<u32>().ok()).collect() };
@@ -745,6 +776,7 @@ fn compare_versions(latest: &str, current: &str) -> bool {
 }
 
 /// 切换账号的反代禁用状态
+#[cfg(feature = "desktop")]
 #[tauri::command]
 pub async fn toggle_proxy_status(
     app: tauri::AppHandle,

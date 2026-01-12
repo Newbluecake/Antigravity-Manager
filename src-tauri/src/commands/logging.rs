@@ -1,8 +1,11 @@
+#[cfg(feature = "desktop")]
 use tauri::command;
 use crate::modules::logger;
+#[cfg(feature = "desktop")]
 use tauri_plugin_opener::OpenerExt;
 
 /// 打开日志目录命令
+#[cfg(feature = "desktop")]
 #[command]
 pub async fn open_logs_folder(app: tauri::AppHandle) -> Result<(), String> {
     let log_dir = logger::get_log_dir()?;
@@ -26,6 +29,7 @@ pub async fn open_logs_folder(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 /// 获取日志目录路径
+#[cfg(feature = "desktop")]
 #[command]
 pub async fn get_logs_path() -> Result<String, String> {
     let log_dir = logger::get_log_dir()?;

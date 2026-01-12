@@ -1,3 +1,5 @@
+#![cfg(feature = "desktop")]
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;

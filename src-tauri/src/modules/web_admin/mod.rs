@@ -8,11 +8,13 @@ pub mod middleware;
 pub mod websocket;
 pub mod context;
 
+#[cfg(feature = "desktop")]
 use tauri::AppHandle;
 use tracing::info;
 
 pub use error::{Result, WebAdminError};
 
+#[cfg(feature = "desktop")]
 pub fn init(app: &AppHandle) -> Result<()> {
     info!("Initializing Web Admin module...");
 
@@ -28,5 +30,18 @@ pub fn init(app: &AppHandle) -> Result<()> {
     });
 
     info!("Web Admin module initialized");
+    Ok(())
+}
+
+#[cfg(not(feature = "desktop"))]
+pub async fn init_standalone() -> Result<()> {
+    info!("Initializing Web Admin module (standalone)...");
+
+    // Initialize database (standalone mode)
+    db::init_db_standalone()?;
+
+    // Start server
+    server::start_server_standalone().await?;
+
     Ok(())
 }

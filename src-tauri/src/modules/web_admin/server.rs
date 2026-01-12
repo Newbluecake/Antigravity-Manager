@@ -7,14 +7,26 @@ use axum::{
     Router,
 };
 use std::net::SocketAddr;
+#[cfg(feature = "desktop")]
 use tauri::AppHandle;
 use tokio::net::TcpListener;
 use tracing::info;
+use rust_embed::Embed;
 
-use crate::modules::web_admin::{assets::Assets, handlers, middleware, websocket, Result, WebAdminError};
+use crate::modules::web_admin::{assets::Assets, handlers, middleware, websocket, Result, WebAdminError, context::ServiceContext};
 use crate::modules::config::load_app_config;
 
+#[cfg(feature = "desktop")]
 pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
+    start_server_with_context(ServiceContext::from_app_handle(app_handle.clone())).await
+}
+
+#[cfg(not(feature = "desktop"))]
+pub async fn start_server_standalone() -> Result<()> {
+    start_server_with_context(ServiceContext::new()).await
+}
+
+async fn start_server_with_context(_context: ServiceContext) -> Result<()> {
     let port = 8046;
 
     // Load configuration to check for LAN access setting
@@ -32,45 +44,30 @@ pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
     // Initialize WebSocket state
     let ws_state = websocket::WebSocketState::new();
 
-    // Public routes
-    let public_routes = Router::new()
-        .route("/auth/login", post(handlers::auth::login))
-        .route("/ws", get(websocket::ws_handler))
-        .with_state(ws_state.clone());
-
-    // Protected routes
-    let protected_routes = Router::new()
-        .route("/dashboard/stats", get(handlers::dashboard::get_stats))
-        // Proxy routes
-        .route("/proxy/status", get(handlers::proxy::get_status))
-        .route("/proxy/start", post(handlers::proxy::start_proxy))
-        .route("/proxy/stop", post(handlers::proxy::stop_proxy))
-        // Account routes
-        .route("/accounts", get(handlers::account::list_accounts).post(handlers::account::add_account))
-        .route("/accounts/:id", get(handlers::account::get_account).patch(handlers::account::update_account).delete(handlers::account::delete_account))
-        .route("/accounts/:id/refresh", post(handlers::account::refresh_account))
-        // System routes
-        .route("/system/logs/files", get(handlers::system::list_log_files))
-        .route("/system/logs", get(handlers::system::get_logs))
-        .layer(axum_middleware::from_fn(middleware::auth_middleware))
-        .with_state(app_handle.clone());
-
-    let api_routes = Router::new()
-        .merge(public_routes)
-        .merge(protected_routes);
-
+    // Build router without mixed states - use () as the unified state type
     let app = Router::new()
         .route("/health", get(health_check))
-        .nest("/api/v1", api_routes)
+        // Public routes
+        .route("/api/v1/auth/login", post(handlers::auth::login))
+        .route("/api/v1/ws", get(websocket::ws_handler))
+        // Protected routes (no state needed for server mode)
+        .route("/api/v1/dashboard/stats", get(handlers::dashboard::get_stats))
+        .route("/api/v1/accounts", get(handlers::account::list_accounts).post(handlers::account::add_account))
+        .route("/api/v1/accounts/:id", get(handlers::account::get_account).patch(handlers::account::update_account).delete(handlers::account::delete_account))
+        .route("/api/v1/accounts/:id/refresh", post(handlers::account::refresh_account))
+        .route("/api/v1/system/logs/files", get(handlers::system::list_log_files))
+        .route("/api/v1/system/logs", get(handlers::system::get_logs))
+        // Static routes
         .route("/", get(redirect_to_admin))
         .route("/admin", get(serve_admin_html))
         .route("/assets/*path", get(serve_asset))
         .fallback(static_handler)
-        .with_state(app_handle.clone());
+        .layer(axum_middleware::from_fn(middleware::auth_middleware))
+        .with_state(ws_state);
 
     let listener = TcpListener::bind(addr).await?;
 
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service())
         .await
         .map_err(|e| WebAdminError::ServerError(e.to_string()))?;
 
@@ -100,6 +97,8 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 }
 
 fn serve_embedded_file(path: &str) -> Response {
+    use rust_embed::Embed;
+
     match Assets::get(path) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();

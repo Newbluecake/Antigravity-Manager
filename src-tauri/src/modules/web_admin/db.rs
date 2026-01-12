@@ -1,5 +1,6 @@
 use rusqlite::Connection;
 use std::path::PathBuf;
+#[cfg(feature = "desktop")]
 use tauri::AppHandle;
 use tracing::info;
 
@@ -18,7 +19,7 @@ pub fn get_connection() -> Result<Connection> {
     Connection::open(&path).map_err(WebAdminError::from)
 }
 
-pub fn init_db(_app: &AppHandle) -> Result<()> {
+fn init_db_internal() -> Result<()> {
     let conn = get_connection()?;
 
     conn.execute(
@@ -40,4 +41,14 @@ pub fn init_db(_app: &AppHandle) -> Result<()> {
 
     info!("Web Admin database initialized at {:?}", get_db_path()?);
     Ok(())
+}
+
+#[cfg(feature = "desktop")]
+pub fn init_db(_app: &AppHandle) -> Result<()> {
+    init_db_internal()
+}
+
+#[cfg(not(feature = "desktop"))]
+pub fn init_db_standalone() -> Result<()> {
+    init_db_internal()
 }

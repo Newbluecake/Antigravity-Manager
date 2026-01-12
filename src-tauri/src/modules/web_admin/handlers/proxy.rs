@@ -1,3 +1,5 @@
+#![cfg(feature = "desktop")]
+
 use axum::{extract::State, Json};
 use tauri::{AppHandle, Manager};
 

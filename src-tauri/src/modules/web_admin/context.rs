@@ -3,6 +3,7 @@
 /// This module provides an abstraction over Tauri's AppHandle to allow Web Admin
 /// to work in both desktop (Tauri) and server (standalone) modes.
 
+#[cfg(feature = "desktop")]
 use tauri::AppHandle;
 
 /// ServiceContext provides access to application services without direct Tauri dependency
@@ -26,7 +27,7 @@ impl ServiceContext {
     }
 
     /// Create a new ServiceContext for server mode (no AppHandle)
-    #[cfg(feature = "server")]
+    #[cfg(not(feature = "desktop"))]
     pub fn new() -> Self {
         Self {}
     }
@@ -51,11 +52,12 @@ impl ServiceContext {
 }
 
 // For backward compatibility with existing handlers that expect AppHandle in State
+#[cfg(feature = "desktop")]
 impl From<AppHandle> for ServiceContext {
-    fn from(app: AppHandle) -> Self {
+    fn from(_app: AppHandle) -> Self {
         #[cfg(feature = "desktop")]
         {
-            Self::from_app_handle(app)
+            Self::from_app_handle(_app)
         }
         #[cfg(not(feature = "desktop"))]
         {

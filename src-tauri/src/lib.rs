@@ -1,20 +1,26 @@
-mod models;
-mod modules;
-mod commands;
+pub mod models;
+pub mod modules;
+pub mod commands;
 mod utils;
-mod proxy;  // 反代服务模块
+pub mod proxy;  // 反代服务模块
 pub mod error;
 
+// Only import and use Tauri when desktop feature is enabled
+#[cfg(feature = "desktop")]
 use tauri::Manager;
+#[cfg(feature = "desktop")]
 use modules::logger;
+#[cfg(feature = "desktop")]
 use tracing::{info, error};
 
 // 测试命令
+#[cfg(feature = "desktop")]
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[cfg(feature = "desktop")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 初始化日志
