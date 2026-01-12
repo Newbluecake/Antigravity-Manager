@@ -1,5 +1,8 @@
 use axum::{
+    body::Body,
+    http::{header, StatusCode, Uri},
     middleware as axum_middleware,
+    response::{IntoResponse, Redirect, Response},
     routing::{get, post},
     Router,
 };
@@ -8,7 +11,7 @@ use tauri::AppHandle;
 use tokio::net::TcpListener;
 use tracing::info;
 
-use crate::modules::web_admin::{handlers, middleware, websocket, Result, WebAdminError};
+use crate::modules::web_admin::{assets::Assets, handlers, middleware, websocket, Result, WebAdminError};
 
 pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
     let port = 8046;
@@ -50,6 +53,10 @@ pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
     let app = Router::new()
         .route("/health", get(health_check))
         .nest("/api/v1", api_routes)
+        .route("/", get(redirect_to_admin))
+        .route("/admin", get(serve_admin_html))
+        .route("/assets/*path", get(serve_asset))
+        .fallback(static_handler)
         .with_state(app_handle.clone());
 
     let listener = TcpListener::bind(addr).await?;
@@ -63,4 +70,39 @@ pub async fn start_server(app_handle: &AppHandle) -> Result<()> {
 
 async fn health_check() -> &'static str {
     "OK"
+}
+
+async fn redirect_to_admin() -> Redirect {
+    Redirect::permanent("/admin")
+}
+
+async fn serve_admin_html() -> impl IntoResponse {
+    serve_embedded_file("admin.html")
+}
+
+async fn serve_asset(uri: Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/');
+    serve_embedded_file(path)
+}
+
+async fn static_handler(uri: Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/');
+    serve_embedded_file(path)
+}
+
+fn serve_embedded_file(path: &str) -> Response {
+    match Assets::get(path) {
+        Some(content) => {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, mime.as_ref())
+                .body(Body::from(content.data.into_owned()))
+                .unwrap()
+        }
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("404 Not Found"))
+            .unwrap(),
+    }
 }

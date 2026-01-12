@@ -64,6 +64,8 @@ tauri-plugin-autostart = "2.5.1"
 sha2 = "0.10"
 headers = "0.4.1"
 jsonwebtoken = { version = "10.2.0", features = ["use_pem", "aws_lc_rs"] }
+rust-embed = "8.9.0"
+mime_guess = "2.0.5"
 
 [dev-dependencies]
 tempfile = "3"

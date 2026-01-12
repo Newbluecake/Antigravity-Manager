@@ -1,5 +1,6 @@
 pub mod error;
 pub mod server;
+pub mod assets;
 pub mod auth;
 pub mod db;
 pub mod handlers;
