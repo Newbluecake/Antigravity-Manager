@@ -9,6 +9,7 @@ interface CollapsibleCardProps {
   children: React.ReactNode;
   defaultExpanded?: boolean;
   rightElement?: React.ReactNode;
+  className?: string;
 }
 
 export function CollapsibleCard({
@@ -18,12 +19,16 @@ export function CollapsibleCard({
   onToggle,
   children,
   defaultExpanded = false,
-  rightElement
+  rightElement,
+  className
 }: CollapsibleCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="bg-white dark:bg-base-100 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/50 overflow-hidden transition-all duration-200 hover:shadow-md">
+    <div className={cn(
+      "bg-white dark:bg-base-100 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/50 overflow-hidden transition-all duration-200 hover:shadow-md",
+      className
+    )}>
       <div
         className="px-5 py-4 flex items-center justify-between cursor-pointer bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
         onClick={(e) => {

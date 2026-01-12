@@ -204,7 +204,7 @@ export function StickySessionConfig({ config, onConfigChange }: StickySessionCon
               <span className="text-xs text-gray-500">seconds</span>
             </div>
             <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">
-              Expired sessions cleaned up every {formatDuration(stickySession.cleanup_interval)}
+              Expired sessions cleaned up every {formatDuration(stickySession.cleanup_interval || 0)}
             </p>
           </div>
         ) : (
