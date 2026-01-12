@@ -43,5 +43,3 @@ __pycache__/
 *.pyc
 
 # Reference projects (for development only)
-
-DOCKER_DEPLOYMENT.md

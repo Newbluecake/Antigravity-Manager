@@ -1,0 +1,10 @@
+target/
+**/*.rs.bk
+*.swp
+.git/
+.github/
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+.DS_Store
+Thumbs.db

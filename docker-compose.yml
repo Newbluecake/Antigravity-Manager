@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  antigravity:
+    image: antigravity-server:latest
+    container_name: antigravity-manager
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8046:8046"  # Web Admin
+      - "8045:8045"  # Proxy Service
+    environment:
+      # Master key for encryption (Required)
+      # In production, use a .env file or Docker secrets
+      - ANTIGRAVITY_MASTER_KEY=${ANTIGRAVITY_MASTER_KEY:-change-me-to-a-secure-random-key-min-16-chars}
+      - RUST_LOG=info
+    volumes:
+      - antigravity_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8046/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  antigravity_data:
