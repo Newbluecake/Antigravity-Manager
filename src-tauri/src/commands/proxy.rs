@@ -92,7 +92,9 @@ pub async fn start_proxy_service(
     }
 
     // 保存配置到全局 AppConfig
-    let app_config = crate::modules::config::load_app_config().map_err(|e| e)?;
+    let mut app_config = crate::modules::config::load_app_config().map_err(|e| e)?;
+    // 确保使用前端传递的最新代理配置 (修复 log_stream_content 不生效的问题)
+    app_config.proxy = config.clone();
 
     // 启动 Axum 服务器
     let (axum_server, server_handle) =
@@ -125,9 +127,7 @@ pub async fn start_proxy_service(
 
 
     // 保存配置到全局 AppConfig
-    let mut app_config_save = app_config.clone();
-    app_config_save.proxy = config.clone();
-    crate::modules::config::save_app_config(&app_config_save).map_err(|e| e)?;
+    crate::modules::config::save_app_config(&app_config).map_err(|e| e)?;
 
     Ok(ProxyStatus {
         running: true,

@@ -96,7 +96,7 @@ export function AdvancedSettings({ config, onConfigChange }: AdvancedSettingsPro
             type="checkbox"
             className="toggle toggle-sm bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600
                      checked:bg-blue-500 checked:border-blue-500"
-            checked={config?.enable_logging ?? true}
+            checked={config?.enable_logging ?? false}
             onChange={(e) => onConfigChange({ enable_logging: e.target.checked })}
           />
         </div>
