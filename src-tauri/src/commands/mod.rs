@@ -340,6 +340,8 @@ pub async fn save_config(
     // 热更新正在运行的服务
     let instance_lock = proxy_state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
+        // 更新完整配置 (包括 log_stream_content 等新增字段)
+        instance.axum_server.update_config(&config.proxy).await;
         // 更新模型映射
         instance.axum_server.update_mapping(&config.proxy).await;
         // 更新上游代理

@@ -40,9 +40,16 @@ pub struct AxumServer {
     proxy_state: Arc<tokio::sync::RwLock<crate::proxy::config::UpstreamProxyConfig>>,
     security_state: Arc<RwLock<crate::proxy::ProxySecurityConfig>>,
     zai_state: Arc<RwLock<crate::proxy::ZaiConfig>>,
+    config_state: Arc<RwLock<crate::models::config::AppConfig>>,
 }
 
 impl AxumServer {
+    pub async fn update_config(&self, proxy_config: &crate::proxy::config::ProxyConfig) {
+        let mut config = self.config_state.write().await;
+        config.proxy = proxy_config.clone();
+        tracing::info!("代理配置已热更新 (包括 log_stream_content 等字段)");
+    }
+
     pub async fn update_mapping(&self, config: &crate::proxy::config::ProxyConfig) {
         {
             let mut m = self.custom_mapping.write().await;
@@ -109,7 +116,7 @@ impl AxumServer {
             zai_vision_mcp: zai_vision_mcp_state,
             monitor: monitor.clone(),
             experimental: experimental_state,
-            config: config_state,
+            config: config_state.clone(),
         };
 
 
@@ -205,6 +212,7 @@ impl AxumServer {
             proxy_state,
             security_state,
             zai_state,
+            config_state: config_state.clone(),
         };
 
         // 在新任务中启动服务器
