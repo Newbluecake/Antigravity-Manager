@@ -98,7 +98,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Antigravity Manager Web Admin v3.4.3</p>
+          <p>Antigravity Manager Web Admin v3.4.4</p>
         </div>
       </div>
     </div>
