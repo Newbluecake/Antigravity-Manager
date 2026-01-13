@@ -36,6 +36,7 @@ export interface ProxyConfig {
   // Advanced settings
   timeout: number; // Request timeout (seconds)
   enable_logging: boolean;
+  log_stream_content?: boolean;
   upstream_proxy?: string; // Upstream proxy URL
 
   // ZAI integration
