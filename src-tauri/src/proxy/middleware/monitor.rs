@@ -22,6 +22,11 @@ pub async fn monitor_middleware(
         return next.run(request).await;
     }
 
+    let log_stream_content = {
+        let config = state.config.read().await;
+        config.proxy.log_stream_content
+    };
+
     let start = Instant::now();
     let method = request.method().to_string();
     let uri = request.uri().to_string();
@@ -109,15 +114,20 @@ pub async fn monitor_middleware(
     };
 
     if content_type.contains("text/event-stream") {
-        log.response_body = Some("[Stream Data]".to_string());
+        if !log_stream_content {
+            log.response_body = Some("[Stream Data]".to_string());
+        }
         let (parts, body) = response.into_parts();
         let mut stream = body.into_data_stream();
         let (tx, rx) = tokio::sync::mpsc::channel(64);
-        
+
         tokio::spawn(async move {
             let mut last_few_bytes = Vec::new();
+            let mut full_response_acc = if log_stream_content { Some(Vec::new()) } else { None };
+
             while let Some(chunk_res) = stream.next().await {
                 if let Ok(chunk) = chunk_res {
+                    // 1. Maintain last few bytes for Usage extraction
                     if chunk.len() > 8192 {
                         last_few_bytes = chunk.slice(chunk.len()-8192..).to_vec();
                     } else {
@@ -126,12 +136,20 @@ pub async fn monitor_middleware(
                             last_few_bytes.drain(0..last_few_bytes.len()-8192);
                         }
                     }
+
+                    // 2. Accumulate full response if enabled (limit to 2MB)
+                    if let Some(acc) = &mut full_response_acc {
+                        if acc.len() < 2 * 1024 * 1024 {
+                             acc.extend_from_slice(&chunk);
+                        }
+                    }
+
                     let _ = tx.send(Ok::<_, axum::Error>(chunk)).await;
                 } else if let Err(e) = chunk_res {
                     let _ = tx.send(Err(axum::Error::new(e))).await;
                 }
             }
-            
+
             if let Ok(full_tail) = std::str::from_utf8(&last_few_bytes) {
                 for line in full_tail.lines().rev() {
                     if line.starts_with("data: ") && line.contains("\"usage\"") {
@@ -149,7 +167,21 @@ pub async fn monitor_middleware(
                     }
                 }
             }
-            
+
+            if let Some(acc) = full_response_acc {
+                let content = if let Ok(s) = std::str::from_utf8(&acc) {
+                    s.to_string()
+                } else {
+                    "[Binary Stream Data]".to_string()
+                };
+
+                if acc.len() >= 2 * 1024 * 1024 {
+                    log.response_body = Some(format!("{} ... [Truncated 2MB]", content));
+                } else {
+                    log.response_body = Some(content);
+                }
+            }
+
             if log.status >= 400 {
                 log.error = Some("Stream Error or Failed".to_string());
             }

@@ -202,6 +202,10 @@ pub struct ProxyConfig {
     #[serde(default)]
     pub enable_logging: bool,
 
+    /// 是否记录流式响应的内容 (仅调试用，可能会消耗较多内存)
+    #[serde(default)]
+    pub log_stream_content: bool,
+
     /// 上游代理配置
     #[serde(default)]
     pub upstream_proxy: UpstreamProxyConfig,
@@ -244,6 +248,7 @@ impl Default for ProxyConfig {
             custom_mapping: std::collections::HashMap::new(),
             request_timeout: default_request_timeout(),
             enable_logging: false, // 默认关闭，节省性能
+            log_stream_content: false, // 默认关闭
             upstream_proxy: UpstreamProxyConfig::default(),
             zai: ZaiConfig::default(),
             scheduling: crate::proxy::sticky_config::StickySessionConfig::default(),

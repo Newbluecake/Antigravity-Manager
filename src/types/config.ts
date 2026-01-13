@@ -13,6 +13,7 @@ export interface ProxyConfig {
     custom_mapping?: Record<string, string | string[]>;
     request_timeout: number;
     enable_logging: boolean;
+    log_stream_content?: boolean;
     upstream_proxy: UpstreamProxyConfig;
     zai?: ZaiConfig;
     scheduling?: StickySessionConfig;

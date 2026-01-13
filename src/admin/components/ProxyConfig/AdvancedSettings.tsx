@@ -101,6 +101,30 @@ export function AdvancedSettings({ config, onConfigChange }: AdvancedSettingsPro
           />
         </div>
 
+        {/* Stream Content Logging */}
+        {config?.enable_logging && (
+          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg ml-4 border-l-2 border-blue-500/20">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <div>
+                <div className="text-xs font-medium text-gray-900 dark:text-white">
+                  Log Stream Content
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                  Record full content of streaming responses (Debug only)
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="toggle toggle-xs bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600
+                       checked:bg-blue-500 checked:border-blue-500"
+              checked={config?.log_stream_content ?? false}
+              onChange={(e) => onConfigChange({ log_stream_content: e.target.checked })}
+            />
+          </div>
+        )}
+
         {/* Auto Start */}
         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
           <div className="flex items-center gap-2">
