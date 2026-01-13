@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Github, User, MessageCircle, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
+import { Save, Github, User, MessageCircle, ExternalLink, RefreshCw, Sparkles, Clock, FileText } from 'lucide-react';
 import { request as invoke } from '../utils/request';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useConfigStore } from '../stores/useConfigStore';
@@ -29,6 +29,7 @@ function Settings() {
             auto_start: false,
             request_timeout: 120,
             enable_logging: false,
+            log_stream_content: false,
             upstream_proxy: {
                 enabled: false,
                 url: ''
@@ -600,6 +601,103 @@ function Settings() {
                     {activeTab === 'proxy' && (
                         <div className="space-y-6">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-base-content">{t('settings.proxy.title')}</h2>
+
+                            {/* 基础代理设置 (超时 & 日志) */}
+                            <div className="p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300 space-y-4">
+                                {/* Request Timeout */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-900 dark:text-base-content mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="w-4 h-4" />
+                                            {t('settings.proxy.request_timeout')}
+                                        </div>
+                                    </label>
+                                    <div className="flex items-center gap-4">
+                                        <input
+                                            type="range"
+                                            min="30"
+                                            max="3600"
+                                            step="10"
+                                            className="range range-primary range-sm flex-1"
+                                            value={formData.proxy.request_timeout}
+                                            onChange={(e) => setFormData({
+                                                ...formData,
+                                                proxy: { ...formData.proxy, request_timeout: parseInt(e.target.value) }
+                                            })}
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="30"
+                                                max="3600"
+                                                className="w-20 px-2 py-1 text-sm border border-gray-200 dark:border-base-300 rounded-lg bg-white dark:bg-base-100 text-gray-900 dark:text-base-content"
+                                                value={formData.proxy.request_timeout}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    proxy: { ...formData.proxy, request_timeout: parseInt(e.target.value) }
+                                                })}
+                                            />
+                                            <span className="text-sm text-gray-500">s</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {t('settings.proxy.request_timeout_hint')}
+                                    </p>
+                                </div>
+
+                                <div className="divider my-0"></div>
+
+                                {/* Enable Logging */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="font-medium text-gray-900 dark:text-base-content flex items-center gap-2">
+                                            <FileText className="w-4 h-4" />
+                                            {t('settings.proxy.enable_logging')}
+                                        </div>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                            {t('settings.proxy.enable_logging_hint')}
+                                        </p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={formData.proxy.enable_logging}
+                                            onChange={(e) => setFormData({
+                                                ...formData,
+                                                proxy: { ...formData.proxy, enable_logging: e.target.checked }
+                                            })}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 dark:bg-base-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                </div>
+
+                                {/* Log Stream Content (Conditional) */}
+                                {formData.proxy.enable_logging && (
+                                    <div className="flex items-center justify-between pl-6 border-l-2 border-blue-500/20 mt-3 animate-in fade-in slide-in-from-top-2">
+                                        <div>
+                                            <div className="font-medium text-gray-900 dark:text-base-content">
+                                                {t('settings.proxy.log_stream_content')}
+                                            </div>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                {t('settings.proxy.log_stream_content_hint')}
+                                            </p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={formData.proxy.log_stream_content || false}
+                                                onChange={(e) => setFormData({
+                                                    ...formData,
+                                                    proxy: { ...formData.proxy, log_stream_content: e.target.checked }
+                                                })}
+                                            />
+                                            <div className="w-9 h-5 bg-gray-200 dark:bg-base-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">
                                 <h3 className="text-md font-semibold text-gray-900 dark:text-base-content mb-3 flex items-center gap-2">

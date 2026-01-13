@@ -398,6 +398,8 @@
             "request_timeout_hint": "Default 120s, range 30-3600s. Restart service to apply changes.",
             "enable_logging": "Enable Request Logging",
             "enable_logging_hint": "Record history for debugging (Minor perf cost)",
+            "log_stream_content": "Log Stream Content",
+            "log_stream_content_hint": "Record full content of streaming responses (Debug only)",
             "upstream_proxy": {
                 "title": "Global Upstream Proxy (Global Proxy)",
                 "desc": "When enabled, all external requests (API Proxy, Token Refresh, Quota Check, Update Check) will be routed through this proxy.",

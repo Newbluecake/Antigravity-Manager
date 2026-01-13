@@ -398,6 +398,8 @@
             "request_timeout_hint": "默认 120 秒，范围 30-3600 秒。修改后需重启服务生效。",
             "enable_logging": "启用请求日志",
             "enable_logging_hint": "记录历史记录以便调试 (微小性能损耗)",
+            "log_stream_content": "记录流式响应内容",
+            "log_stream_content_hint": "记录完整的流式响应内容 (仅调试用，可能消耗较多内存)",
             "upstream_proxy": {
                 "title": "全局上游代理 (Global Proxy)",
                 "desc": "开启后，应用内所有外部请求（API 反代、Token 刷新、配额查询、更新检测）都将通过此代理。",
